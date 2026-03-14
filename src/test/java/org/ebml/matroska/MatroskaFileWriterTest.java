@@ -14,15 +14,13 @@ import org.ebml.io.FileDataSource;
 import org.ebml.io.FileDataWriter;
 import org.ebml.matroska.MatroskaFileTrack.TrackOperation;
 import org.ebml.matroska.MatroskaFileTrack.TrackType;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class MatroskaFileWriterTest {
 	private static final Logger LOG = LoggerFactory.getLogger(MatroskaFileWriterTest.class);
 	private File destination;
@@ -30,7 +28,7 @@ public class MatroskaFileWriterTest {
 	private MatroskaFileTrack testTrack;
 	private int timecode = 1337;
 
-	@BeforeAll
+	@BeforeEach
 	public void setUp() throws Exception {
 		this.destination = File.createTempFile("test", ".mkv");
 		this.ioDW = new FileDataWriter(this.destination.getPath());
@@ -41,7 +39,7 @@ public class MatroskaFileWriterTest {
 		this.testTrack.setDefaultDuration(33);
 	}
 
-	@AfterAll
+	@AfterEach
 	public void tearDown() throws Exception {
 		this.ioDW.close();
 		this.destination.delete();
