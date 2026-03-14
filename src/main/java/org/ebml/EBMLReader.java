@@ -109,22 +109,36 @@ public class EBMLReader
       return null;
     }
 
-    final Element elem = ProtoType.getInstance(elementType);
+    Element elem = ProtoType.getInstance(elementType);
+
+    // Read the size (needed for both known and unknown elements).
+    final long elementSize = readEBMLCode(source);
+    final long end = source.getFilePointer();
 
     if (elem == null)
     {
-      return null;
+      // Unknown element: skip its data and create a BinaryElement placeholder
+      // so that MasterElement.readNextChild() can track usedSize correctly.
+      LOG.debug("Skipping unknown element (id bytes={}) with size {}", bytesToHex(elementType.array()), elementSize);
+      if (elementSize > 0)
+      {
+        source.skip(elementSize);
+      }
+      // Create a placeholder element with correct size info
+      final BinaryElement placeholder = new BinaryElement();
+      placeholder.setType(elementType);
+      placeholder.setSize(elementSize);
+      placeholder.setHeadersSize(end - position);
+      placeholder.dataRead = true;
+      return placeholder;
     }
     LOG.trace("Read element {}", elem.getElementType().getName());
 
-    // Read the size.
-    final long elementSize = readEBMLCode(source);
     if (elementSize == 0)
     {
       // Zero sized element is valid
       LOG.error("Invalid element size for {}", elem.typeInfo.getName());
     }
-    final long end = source.getFilePointer();
 
     // Set it's size
     elem.setSize(elementSize);
