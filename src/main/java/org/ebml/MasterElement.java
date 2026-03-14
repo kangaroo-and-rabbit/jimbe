@@ -58,6 +58,13 @@ public class MasterElement extends Element
 
     usedSize += elem.getTotalSize();
 
+    if (elem.typeInfo == null)
+    {
+      // Unknown element placeholder: skip it and read the next child
+      LOG.debug("Skipping unknown element placeholder of size {}: {} remaining", elem.getTotalSize(), size - usedSize);
+      return readNextChild(reader);
+    }
+
     LOG.trace("Read element {} of size {}: {} remaining", elem.typeInfo.getName(), elem.getTotalSize(), size - usedSize);
     return elem;
   }
