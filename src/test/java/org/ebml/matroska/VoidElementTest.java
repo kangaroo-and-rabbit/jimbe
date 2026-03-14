@@ -9,50 +9,33 @@
 package org.ebml.matroska;
 
 import org.ebml.MockWriter;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class VoidElementTest
-{
-  @Before
-  public void setUp() throws Exception
-  {
-  }
-
-  @After
-  public void tearDown() throws Exception
-  {
-  }
-
-  /**
-   * Voids of size 2 to 9 should be all header, no body
-   */
-  @Test
-  public void test2To9()
-  {
-    for (int i = 2; i < 10; ++i)
-    {
-      VoidElement voidz = new VoidElement(i);
-      MockWriter mw = new MockWriter();
-      voidz.writeElement(mw);
-      Assert.assertEquals(i, mw.getBuff().position());
-    }
-  }
-
-  /**
-   * Voids of size > 10 will have body. Under the previous schema for writing voids, value 127 would have failed.
-   */
-  @Test
-  public void test10To130()
-  {
-    for (int i = 10; i < 130; ++i)
-    {
-      VoidElement voidz = new VoidElement(i);
-      MockWriter mw = new MockWriter();
-      voidz.writeElement(mw);
-      Assert.assertEquals(i, mw.getBuff().position());
-    }
-  }
+public class VoidElementTest {
+	/**
+	 * Voids of size 2 to 9 should be all header, no body
+	 */
+	@Test
+	public void test2To9() {
+		for (int i = 2; i < 10; ++i) {
+			VoidElement voidz = new VoidElement(i);
+			MockWriter mw = new MockWriter();
+			voidz.writeElement(mw);
+			Assertions.assertEquals(i, mw.getBuff().position());
+		}
+	}
+	
+	/**
+	 * Voids of size > 10 will have body. Under the previous schema for writing voids, value 127 would have failed.
+	 */
+	@Test
+	public void test10To130() {
+		for (int i = 10; i < 130; ++i) {
+			VoidElement voidz = new VoidElement(i);
+			MockWriter mw = new MockWriter();
+			voidz.writeElement(mw);
+			Assertions.assertEquals(i, mw.getBuff().position());
+		}
+	}
 }
