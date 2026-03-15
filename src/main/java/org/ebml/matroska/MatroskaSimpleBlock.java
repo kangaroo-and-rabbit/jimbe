@@ -6,11 +6,9 @@ import java.util.BitSet;
 import java.util.List;
 
 import org.ebml.BinaryElement;
-import org.ebml.EBMLReader;
 import org.ebml.Element;
 import org.ebml.MasterElement;
 import org.ebml.UnsignedIntegerElement;
-import org.ebml.io.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,16 +34,6 @@ class MatroskaSimpleBlock
 
   }
 
-  public MatroskaSimpleBlock(final long duration)
-  {
-
-  }
-
-  static MatroskaSimpleBlock fromElement(final Element level3, final DataSource ioDS, final EBMLReader reader)
-  {
-    // TODO: make this work.
-    return new MatroskaSimpleBlock();
-  }
 
   Element toElement()
   {
