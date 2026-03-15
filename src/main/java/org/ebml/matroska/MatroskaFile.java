@@ -64,6 +64,8 @@ public class MatroskaFile
   private final ArrayList<MatroskaFileTagEntry> tagList = new ArrayList<>();
   private final Queue<MatroskaFileFrame> frameQueue = new ConcurrentLinkedQueue<>();
   private boolean scanFirstCluster = true;
+  private long firstClusterFilePosition = -1;
+  private long usedSizeBeforeFirstCluster = 0;
 
   /**
    * Primary Constructor for Matroska File class.
@@ -138,6 +140,12 @@ public class MatroskaFile
         }
         else if (level1.isType(MatroskaDocTypes.Cluster.getType()))
         {
+          // Remember where the first Cluster header starts for seek() support.
+          // After readNextChild, the file pointer is right after the Cluster header.
+          // Compute the header start by subtracting the header size.
+          final long clusterHeaderSize = level1.getTotalSize() - level1.getSize();
+          firstClusterFilePosition = ioDS.getFilePointer() - clusterHeaderSize;
+          usedSizeBeforeFirstCluster = ((MasterElement) level0).getUsedSize() - level1.getTotalSize();
           if (scanFirstCluster)
           {
             parseNextCluster(level1);
@@ -307,6 +315,64 @@ public class MatroskaFile
    */
   public long seek(final long timecode)
   {
+    if (level0 == null)
+    {
+      throw new IllegalStateException("Call readFile() before seeking");
+    }
+    if (firstClusterFilePosition < 0)
+    {
+      throw new IllegalStateException("No cluster found in file, cannot seek");
+    }
+    if (!ioDS.isSeekable())
+    {
+      throw new UnsupportedOperationException("DataSource is not seekable");
+    }
+
+    // Clear any buffered frames
+    frameQueue.clear();
+
+    // Seek the file back to the start of the first Cluster header
+    ioDS.seek(firstClusterFilePosition);
+    // Reset the Segment element's usedSize so readNextChild() can re-read clusters
+    ((MasterElement) level0).setUsedSize(usedSizeBeforeFirstCluster);
+
+    // Read frames, discarding those before the target timecode.
+    // Per the Javadoc: discard until we hit a timecode larger than requested,
+    // then the seek target is the last frame with timecode <= requested.
+    // After seek(), getNextFrame() returns that frame.
+    MatroskaFileFrame seekTarget = null;
+    while (true)
+    {
+      if (frameQueue.isEmpty())
+      {
+        fillFrameQueue();
+      }
+      if (frameQueue.isEmpty())
+      {
+        // End of file. Return what we have.
+        break;
+      }
+      final MatroskaFileFrame head = frameQueue.peek();
+      if (head.getTimecode() > timecode)
+      {
+        // Passed the target. seekTarget is the last frame <= timecode.
+        break;
+      }
+      // This frame's timecode <= requested. Remove and keep as candidate.
+      frameQueue.remove();
+      seekTarget = head;
+    }
+
+    if (seekTarget != null)
+    {
+      // Re-insert the seek target at the head of the queue.
+      // Drain, prepend, re-add.
+      final ArrayList<MatroskaFileFrame> remaining = new ArrayList<>(frameQueue);
+      frameQueue.clear();
+      frameQueue.add(seekTarget);
+      frameQueue.addAll(remaining);
+      return seekTarget.getTimecode();
+    }
     return 0;
   }
 

@@ -94,4 +94,25 @@ public class MasterElement extends Element
     children.add(elem);
     size += elem.getTotalSize();
   }
+
+  /**
+   * Sets the number of bytes already consumed by readNextChild().
+   * Used for seeking: after repositioning the DataSource,
+   * usedSize must be adjusted so readNextChild() knows how
+   * many bytes remain.
+   *
+   * @param usedSize new used-size value
+   */
+  public void setUsedSize(final long usedSize)
+  {
+    this.usedSize = usedSize;
+  }
+
+  /**
+   * @return the number of bytes consumed by readNextChild() so far
+   */
+  public long getUsedSize()
+  {
+    return usedSize;
+  }
 }
