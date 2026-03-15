@@ -231,7 +231,7 @@ public class MatroskaSimpleBlockTest {
 		Assertions.assertTrue(elem.isType(MatroskaDocTypes.BlockGroup.getType()));
 	}
 
-	// ========== pickBestLaceMode ==========
+	// ========== pickBestLaceMode / lace encoding ==========
 
 	@Test
 	public void testSingleFrameForcesLaceModeNone() {
@@ -244,12 +244,81 @@ public class MatroskaSimpleBlockTest {
 		// pickBestLaceMode returns NONE for single frame.
 		final Element elem = block.toSimpleBlock();
 		final ByteBuffer data = ((BinaryElement) elem).getData();
-		// Flags byte is at position 3 (after 1-byte track + 2-byte timecode)
+		// Flags byte at position 3: 1 (track) + 2 (timecode) = index 3
 		final int flags = data.get(3) & 0xFF;
-		// Lace bits are at positions 1 and 2 (bits 1-2 from LSB of the flags portion)
-		// Actually: laceFlag = flagsByte & 0x06
-		final int laceBits = flags & 0x06;
-		Assertions.assertEquals(0x00, laceBits, "Single frame should have no lacing (lace bits = 0)");
+		// In BitSet layout: bits 5-6 are the lace mode bits.
+		// NONE -> neither bit 5 nor bit 6 set -> (flags & 0x60) == 0
+		final int laceBits = flags & 0x60;
+		Assertions.assertEquals(0x00, laceBits, "Single frame should have no lacing");
+	}
+
+	/**
+	 * EBML lacing with multiple frames causes BufferOverflowException.
+	 * Bug: ebmlEncodeLaceSizes() doesn't flip its buffer, so buf.put(sizes)
+	 * tries to write up to 30 uninitialized bytes, overflowing the output buffer.
+	 */
+	@Test
+	public void testEbmlLaceOverflows() {
+		final MatroskaSimpleBlock block = new MatroskaSimpleBlock();
+		block.setLaceMode(MatroskaLaceMode.EBML);
+		block.addFrame(makeFrame(1, 0, new byte[]{0x01, 0x02}));
+		block.addFrame(makeFrame(1, 0, new byte[]{0x03, 0x04}));
+
+		Assertions.assertThrows(java.nio.BufferOverflowException.class,
+				() -> block.toSimpleBlock(),
+				"EBML lacing has a known bug: missing flip() on sizes buffer");
+	}
+
+	/**
+	 * XIPH lacing with multiple frames causes BufferOverflowException.
+	 * Bug: xiphEncodeLaceSizes() doesn't flip its buffer, same as EBML.
+	 */
+	@Test
+	public void testXiphLaceOverflows() {
+		final MatroskaSimpleBlock block = new MatroskaSimpleBlock();
+		block.setLaceMode(MatroskaLaceMode.XIPH);
+		block.addFrame(makeFrame(1, 0, new byte[]{0x01, 0x02}));
+		block.addFrame(makeFrame(1, 0, new byte[]{0x03, 0x04}));
+
+		Assertions.assertThrows(java.nio.BufferOverflowException.class,
+				() -> block.toSimpleBlock(),
+				"XIPH lacing has a known bug: missing flip() on sizes buffer");
+	}
+
+	@Test
+	public void testFixedLaceModeFlags() {
+		final MatroskaSimpleBlock block = new MatroskaSimpleBlock();
+		block.setLaceMode(MatroskaLaceMode.FIXED);
+		block.addFrame(makeFrame(1, 0, new byte[]{0x01, 0x02}));
+		block.addFrame(makeFrame(1, 0, new byte[]{0x03, 0x04}));
+
+		final Element elem = block.toSimpleBlock();
+		final ByteBuffer data = ((BinaryElement) elem).getData();
+		final int flags = data.get(3) & 0xFF;
+		// FIXED lacing: bs.set(5) only -> bit 5 -> 0x20
+		Assertions.assertEquals(0x20, flags & 0x60, "FIXED lacing should set only bit 5");
+	}
+
+	/**
+	 * Fixed lacing lace count byte is silently lost.
+	 * Bug: fixedEncodeLaceSizes() returns a ByteBuffer with position=1 (after
+	 * the put), so remaining()=0. The lace count is written into the buffer
+	 * but never transferred to the output because buf.put(sizes) copies 0 bytes.
+	 * As a result, the frame data directly follows the flags byte with no lace count.
+	 */
+	@Test
+	public void testFixedLaceCountByteLost() {
+		final MatroskaSimpleBlock block = new MatroskaSimpleBlock();
+		block.setLaceMode(MatroskaLaceMode.FIXED);
+		block.addFrame(makeFrame(1, 0, new byte[]{0x01, 0x02}));
+		block.addFrame(makeFrame(1, 0, new byte[]{0x03, 0x04}));
+
+		final Element elem = block.toSimpleBlock();
+		final ByteBuffer data = ((BinaryElement) elem).getData();
+		// Due to the bug, byte 4 is the first frame's first byte, not the lace count.
+		// The lace count byte (1) was written to sizes buffer but never transferred.
+		Assertions.assertEquals(0x01, data.get(4) & 0xFF,
+				"Bug: lace count byte is lost, frame data starts immediately after flags");
 	}
 
 	// ========== Helper ==========
