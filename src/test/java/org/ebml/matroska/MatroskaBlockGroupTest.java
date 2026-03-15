@@ -489,6 +489,98 @@ public class MatroskaBlockGroupTest {
 				"Third frame data should be 2 bytes");
 	}
 
+	// ========== Multi-frame laced BlockGroup ==========
+
+	/**
+	 * Build a BlockGroup with a fixed-laced Block + BlockDuration.
+	 * This is a rare case (lacing inside a BlockGroup), but parseNextCluster
+	 * supports it via the block.getFrameCount() > 1 loop in the BlockGroup
+	 * branch (lines ~491-505 in MatroskaFile.java).
+	 */
+	private byte[] buildLacedBlockGroup(final int trackNo, final short timecode,
+			final byte[][] frames, final long duration) {
+		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
+
+		// Block (0xA1) with fixed-size lacing
+		final byte[] blockInner = buildFixedLacedBlock(trackNo, timecode, frames);
+		writeRawElement(inner, new byte[]{(byte) 0xA1}, blockInner);
+
+		// BlockDuration (0x9B)
+		writeRawElement(inner, new byte[]{(byte) 0x9B}, encodeUnsignedInt(duration));
+
+		// Wrap in BlockGroup (0xA0)
+		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
+		writeRawElement(bg, new byte[]{(byte) 0xA0}, inner.toByteArray());
+		return bg.toByteArray();
+	}
+
+	/**
+	 * Build Block inner data with fixed-size lacing (no keyframe flag).
+	 */
+	private byte[] buildFixedLacedBlock(final int trackNo, final short timecode,
+			final byte[][] frames) {
+		final ByteArrayOutputStream out = new ByteArrayOutputStream();
+		out.writeBytes(Element.makeEbmlCodedSize(trackNo));
+		out.write((timecode >> 8) & 0xFF);
+		out.write(timecode & 0xFF);
+		// flags: no keyframe + fixed lacing (0x04)
+		out.write(0x04);
+		// lace count
+		out.write(frames.length - 1);
+		for (final byte[] frame : frames) {
+			out.writeBytes(frame);
+		}
+		return out.toByteArray();
+	}
+
+	/**
+	 * Test that a BlockGroup containing a fixed-laced Block with multiple
+	 * frames is parsed correctly. This covers the getFrameCount() > 1 path
+	 * in the BlockGroup branch of parseNextCluster().
+	 *
+	 * The commented-out badMP3Headers() calls in the source (lines ~496-503)
+	 * were debug checks from the original author, left commented out rather
+	 * than deleted. They would have validated MP3 frame headers on track 2
+	 * after each laced frame was added to the queue.
+	 */
+	@Test
+	public void testLacedBlockGroupMultipleFrames() throws IOException {
+		writeBaseMkv();
+
+		final byte[][] frameData = {
+			{0x11, 0x22, 0x33},
+			{0x44, 0x55, 0x66},
+			{0x77, (byte) 0x88, (byte) 0x99}
+		};
+		final byte[] blockGroup = buildLacedBlockGroup(1, (short) 0, frameData, 100);
+		final byte[] cluster = buildCluster(0, blockGroup);
+
+		replaceCluster(cluster);
+
+		final FileDataSource inputDataSource = new FileDataSource(this.destination.getPath());
+		final MatroskaFile reader = new MatroskaFile(inputDataSource);
+		reader.readFile();
+
+		// First frame from laced BlockGroup
+		final MatroskaFileFrame firstFrame = reader.getNextFrame();
+		Assertions.assertNotNull(firstFrame, "First laced BlockGroup frame should not be null");
+		Assertions.assertEquals(0, firstFrame.getTimecode());
+		Assertions.assertEquals(1, firstFrame.getTrackNo());
+		Assertions.assertEquals(100, firstFrame.getDuration());
+		Assertions.assertEquals(3, firstFrame.getData().remaining());
+
+		// Second frame (covers the getFrameCount() > 1 loop in BlockGroup branch)
+		final MatroskaFileFrame secondFrame = reader.getNextFrame();
+		Assertions.assertNotNull(secondFrame, "Second laced BlockGroup frame should not be null");
+		Assertions.assertEquals(100, secondFrame.getDuration());
+		Assertions.assertEquals(3, secondFrame.getData().remaining());
+
+		// Third frame
+		final MatroskaFileFrame thirdFrame = reader.getNextFrame();
+		Assertions.assertNotNull(thirdFrame, "Third laced BlockGroup frame should not be null");
+		Assertions.assertEquals(3, thirdFrame.getData().remaining());
+	}
+
 	// ========== Multi-cluster ==========
 
 	@Test
