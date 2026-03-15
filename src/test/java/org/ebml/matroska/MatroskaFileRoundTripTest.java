@@ -494,6 +494,94 @@ public class MatroskaFileRoundTripTest {
 		Assertions.assertEquals(2, readNonKey.getData().remaining());
 	}
 
+	@Test
+	public void testDateUTCRoundTrip() throws IOException {
+		final MatroskaFileWriter writer = new MatroskaFileWriter(this.ioDW);
+		addDummyTrackAndFrame(writer);
+		writer.close();
+
+		final MatroskaFile reader = openReader();
+		final String report = reader.getReport();
+		// MatroskaSegmentInfo writes DateUTC with current date.
+		// parseSegmentInfo reads it into segmentDate.
+		// The report prints "Segment Date: <date>", which should not be null.
+		Assertions.assertTrue(report.contains("Segment Date:"), "Report should contain Segment Date");
+		Assertions.assertFalse(report.contains("Segment Date: null"), "Segment Date should not be null");
+	}
+
+	@Test
+	public void testSegmentTitleViaReport() throws IOException {
+		// The writer does not write a Title element, so segmentTitle stays null.
+		final MatroskaFileWriter writer = new MatroskaFileWriter(this.ioDW);
+		addDummyTrackAndFrame(writer);
+		writer.close();
+
+		final MatroskaFile reader = openReader();
+		// No title written -> getSegmentTitle() returns null
+		Assertions.assertNull(reader.getSegmentTitle());
+		final String report = reader.getReport();
+		Assertions.assertTrue(report.contains("Segment Title: null"));
+	}
+
+	/**
+	 * Test that parseSegmentInfo reads the Title element.
+	 * The writer doesn't write a Title, so we inject a second Info element
+	 * (containing only Title) before the Cluster. The parser will read it
+	 * and overwrite the segmentTitle field.
+	 */
+	@Test
+	public void testSegmentTitleInjected() throws Exception {
+		final MatroskaFileWriter writer = new MatroskaFileWriter(this.ioDW);
+		addDummyTrackAndFrame(writer);
+		writer.close();
+
+		// Build an Info element containing only a Title child
+		final byte[] titleStr = "My Test Title".getBytes(StandardCharsets.UTF_8);
+		final java.io.ByteArrayOutputStream titleElem = new java.io.ByteArrayOutputStream();
+		titleElem.write(new byte[]{(byte) 0x7B, (byte) 0xA9}); // Title type ID
+		titleElem.write(org.ebml.Element.makeEbmlCodedSize(titleStr.length));
+		titleElem.write(titleStr);
+
+		final java.io.ByteArrayOutputStream infoElem = new java.io.ByteArrayOutputStream();
+		final byte[] infoData = titleElem.toByteArray();
+		infoElem.write(new byte[]{(byte) 0x15, (byte) 0x49, (byte) 0xA9, (byte) 0x66}); // Info type ID
+		infoElem.write(org.ebml.Element.makeEbmlCodedSize(infoData.length));
+		infoElem.write(infoData);
+
+		// Inject the Info element before the Cluster using the same technique as tag tests
+		injectBeforeCluster(infoElem.toByteArray());
+
+		final MatroskaFile reader = openReader();
+		Assertions.assertEquals("My Test Title", reader.getSegmentTitle());
+	}
+
+	private void injectBeforeCluster(final byte[] injectedBytes) throws Exception {
+		final byte[] fileBytes;
+		try (final java.io.RandomAccessFile raf = new java.io.RandomAccessFile(this.destination, "r")) {
+			fileBytes = new byte[(int) raf.length()];
+			raf.readFully(fileBytes);
+		}
+
+		// Find the last occurrence of Cluster ID (0x1F43B675) to skip SeekHead entries
+		int clusterPos = -1;
+		for (int i = 0; i < fileBytes.length - 3; i++) {
+			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43
+					&& fileBytes[i + 2] == (byte) 0xB6 && fileBytes[i + 3] == (byte) 0x75) {
+				clusterPos = i;
+			}
+		}
+		Assertions.assertTrue(clusterPos > 0, "Could not find Cluster element in file");
+
+		try (final java.io.RandomAccessFile raf = new java.io.RandomAccessFile(this.destination, "rw");
+			 final java.nio.channels.FileChannel ch = raf.getChannel()) {
+			ch.position(0);
+			ch.write(ByteBuffer.wrap(fileBytes, 0, clusterPos));
+			ch.write(ByteBuffer.wrap(injectedBytes));
+			ch.write(ByteBuffer.wrap(fileBytes, clusterPos, fileBytes.length - clusterPos));
+			ch.truncate(ch.position());
+		}
+	}
+
 	private void addDummyTrackAndFrame(final MatroskaFileWriter writer) {
 		final MatroskaFileTrack track = new MatroskaFileTrack();
 		track.setTrackNo(1);
