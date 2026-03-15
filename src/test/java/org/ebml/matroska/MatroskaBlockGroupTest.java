@@ -581,6 +581,33 @@ public class MatroskaBlockGroupTest {
 		Assertions.assertEquals(3, thirdFrame.getData().remaining());
 	}
 
+	/**
+	 * Test that a BlockGroup with no Block child throws NullPointerException.
+	 * This covers the guard at line 478-481 in parseNextCluster().
+	 */
+	@Test
+	public void testBlockGroupWithNoBlockThrows() throws IOException {
+		writeBaseMkv();
+
+		// Build a BlockGroup containing only a BlockDuration (no Block child)
+		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
+		// BlockDuration (0x9B) with value 100
+		writeRawElement(inner, new byte[]{(byte) 0x9B}, encodeUnsignedInt(100));
+		// Wrap in BlockGroup (0xA0)
+		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
+		writeRawElement(bg, new byte[]{(byte) 0xA0}, inner.toByteArray());
+
+		final byte[] cluster = buildCluster(0, bg.toByteArray());
+		replaceCluster(cluster);
+
+		final FileDataSource inputDataSource = new FileDataSource(this.destination.getPath());
+		final MatroskaFile reader = new MatroskaFile(inputDataSource);
+
+		// readFile() with scanFirstCluster=true parses the first cluster eagerly,
+		// so the exception is thrown during readFile(), not getNextFrame().
+		Assertions.assertThrows(NullPointerException.class, () -> reader.readFile());
+	}
+
 	// ========== Multi-cluster ==========
 
 	@Test
