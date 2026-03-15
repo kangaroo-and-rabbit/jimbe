@@ -2,10 +2,16 @@ package org.ebml;
 
 import java.nio.ByteBuffer;
 
+import org.ebml.matroska.MatroskaDocTypes;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class EBMLReaderTest {
+
+	// Force MatroskaDocTypes class loading so ProtoType.CLASS_MAP is populated
+	@SuppressWarnings("unused")
+	private static final Object INIT = MatroskaDocTypes.EBMLVersion;
 
 	@Test
 	public void testReadEBMLCodeSize() {
