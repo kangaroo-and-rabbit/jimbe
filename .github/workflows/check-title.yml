@@ -1,0 +1,35 @@
+---
+name: "Check PR title"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - ready_for_review
+      - reopened
+      - labeled
+      - unlabeled
+
+jobs:
+  check-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check title"
+        uses: Slashgear/action-check-pr-title@v5.0.1
+        with:
+          regexp: "\\[(API,)?(API|DEV-OPS|DOC|FEAT|FIX|FIX\\-CI|STYLE)\\]( \\([A-Za-z0-9.\\-/_]+\\))? [A-Za-z0-9: ,.'\\-!/_]+$"
+          helpMessage: |
+            Title of the PR MUST respect format: "[{TYPE}] clear description without typos in english" with {TYPE}:
+              * [API] Change API that permit to access on the application (un-compatibility only). This one can specifically added with [API,{TYPE}]
+              * [DEV-OPS] Update automatic build system, method to deliver application/packages, ...
+              * [DOC] Update or add some documentation.
+              * [FEAT] Develop a new feature
+              * [FIX] When fixing issue
+              * [FIX-CI] When the CI fail to build and we apply a correction to set it work again.
+              * [STYLE] Update of the style tools/checker, or add/remove rules.
+            Examples:
+              [FEAT] My beautiful feature
+              [API,FIX] Change API to fix typo
+              [FIX] (module) Correct part of ...

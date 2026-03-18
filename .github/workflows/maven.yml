@@ -1,0 +1,69 @@
+# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Java CI with Maven
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start MongoDB with Replica Set
+        run: |
+          # Create keyfile directory
+          mkdir -p $HOME/mongodb/keys
+          # Generate keyfile
+          openssl rand -base64 756 > $HOME/mongodb/keys/keyfile
+          chmod 400 $HOME/mongodb/keys/keyfile
+          # Start MongoDB container with replica set and keyfile
+          docker run -d \
+            --name mongodb \
+            -p 27017:27017 \
+            -e MONGO_INITDB_ROOT_USERNAME=root \
+            -e MONGO_INITDB_ROOT_PASSWORD=base_db_password \
+            -v $HOME/mongodb/keys:/data/keys \
+            mongo:latest \
+            bash -c "chown 999:999 /data/keys/keyfile && exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keys/keyfile"
+          # Wait for MongoDB to be ready
+          sleep 10
+          # Initialize replica set
+          docker exec mongodb mongosh "mongodb://root:base_db_password@localhost:27017/admin" --eval '
+            rs.initiate({
+              _id: "rs0",
+              members: [{ _id: 0, host: "localhost:27017" }]
+            })
+          '
+          # Wait for replica set to be ready
+          sleep 5
+      - uses: actions/checkout@v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: validate
+        run: mvn validate
+      - name: compile
+        run: mvn compile
+      - name: Build with Maven
+        run: mvn -B package -DskipTests --file pom.xml
+      - name: spot-bug
+        run: mvn spotbugs:check
+      - name: Test 
+        run: DB_HOST="127.0.0.1" mvn test
+      - name: find the element
+        run: find . -name "dependency-graph.json"
+      # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
+      - name: Update dependency graph
+        uses: advanced-security/maven-dependency-submission-action@b275d12641ac2d2108b2cbb7598b154ad2f2cee8
