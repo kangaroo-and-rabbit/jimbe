@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 public class FloatElementTest {
 
-	// Use 4-byte IDs in unused range to avoid collision with MatroskaDocTypes
+	// Use 4-byte IDs in unused range to avoid collision with DocTypes
 	private static final byte[] FLOAT_ID_1 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x01};
 	private static final byte[] FLOAT_ID_2 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x02};
 	private static final byte[] FLOAT_ID_3 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x03};

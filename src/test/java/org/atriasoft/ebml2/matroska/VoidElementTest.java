@@ -8,6 +8,8 @@
 
 package org.atriasoft.ebml2.matroska;
 
+import org.atriasoft.ebml2.matroska.model.*;
+
 import org.atriasoft.ebml2.MockWriter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

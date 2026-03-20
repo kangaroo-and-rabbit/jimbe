@@ -1,5 +1,7 @@
 package org.atriasoft.ebml2.matroska;
 
+import org.atriasoft.ebml2.matroska.model.*;
+
 import java.nio.ByteBuffer;
 import java.util.Random;
 
