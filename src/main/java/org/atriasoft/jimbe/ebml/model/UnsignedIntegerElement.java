@@ -23,30 +23,40 @@ import java.nio.ByteBuffer;
 
 import org.atriasoft.jimbe.ebml.Reader;
 
-/*
- * UnsignedIntegerElement.java
- *
- * Created on February 15, 2003, 6:27 PM
- */
 /**
- * Basic class for the Unsigned Integer data type in EBML.
- *
- * @author John Cannon
+ * EBML element containing an unsigned integer value. The value is stored in big-endian
+ * format using the minimum number of bytes needed.
  */
 public class UnsignedIntegerElement extends BinaryElement {
 
+	/**
+	 * Creates an unsigned integer element with the specified type ID.
+	 *
+	 * @param typeID the EBML element ID bytes
+	 */
 	public UnsignedIntegerElement(final byte[] typeID) {
 		super(typeID);
 	}
 
+	/** Creates an empty unsigned integer element. */
 	public UnsignedIntegerElement() {}
 
+	/**
+	 * Sets the unsigned integer value.
+	 *
+	 * @param value the value to set
+	 */
 	public void setValue(final long value) {
 		final ByteBuffer buf = ByteBuffer.wrap(packIntUnsigned(value));
 		LOG.trace("Setting value {} to {}", value, Reader.bytesToHex(buf.array()));
 		setData(buf);
 	}
 
+	/**
+	 * Returns the unsigned integer value.
+	 *
+	 * @return the decoded unsigned value
+	 */
 	public long getValue() {
 		return Reader.parseEBMLCode(this.data.duplicate());
 	}

@@ -34,10 +34,11 @@ public class VoidElement extends Element {
 	private static final long MAX_SIZE = (long) (Math.pow(2, 56) - 2);
 	private long realSize;
 
-	/*
-	 * Creates a new instance of Element
+	/**
+	 * Creates a new VoidElement with the specified total size in bytes.
 	 *
-	 * @param type The type ID of this element
+	 * @param size the total size of the void element (must be greater than 1 and less than 2^56 - 2)
+	 * @throws IllegalArgumentException if the size is out of the valid range
 	 */
 	public VoidElement(final long size) {
 		setElementType(DocTypes.Void);
@@ -46,7 +47,11 @@ public class VoidElement extends Element {
 	}
 
 	/**
-	 * @see Element#writeHeaderData(DataWriter)
+	 * {@inheritDoc}
+	 * <p>
+	 * Writes the void element header, forcing the size field to use up to 8 bytes
+	 * to allow creating voids of any desired total size.
+	 * </p>
 	 */
 	@Override
 	public long writeHeaderData(final DataWriter writer) {
@@ -68,6 +73,12 @@ public class VoidElement extends Element {
 		return len;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Writes the void body as a sequence of bytes filled with the value 1.
+	 * </p>
+	 */
 	@Override
 	public long writeData(final DataWriter ioDW) {
 		final byte[] voids = new byte[(int) getSize()];
@@ -75,6 +86,15 @@ public class VoidElement extends Element {
 		return ioDW.write(ByteBuffer.wrap(voids));
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Overrides the default size calculation to account for the forced 8-byte size encoding,
+	 * ensuring void elements can be created at any desired total size.
+	 * </p>
+	 *
+	 * @throws IllegalArgumentException if the size is less than 2 or greater than 2^56 - 2
+	 */
 	@Override
 	public void setSize(final long size) {
 		if (size < 2 || size > MAX_SIZE) {
@@ -88,6 +108,11 @@ public class VoidElement extends Element {
 		super.setSize(partialSize - Math.min(partialSize, 8));
 	}
 
+	/**
+	 * Reduces the body size of this void element by the specified amount.
+	 *
+	 * @param size the number of bytes to subtract from the current body size
+	 */
 	public void reduceSize(final long size) {
 		super.setSize(getSize() - size);
 	}

@@ -27,6 +27,19 @@ import org.atriasoft.jimbe.ebml.model.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Represents a Matroska Block element used for reading frame data from a container.
+ * <p>
+ * A Block contains one or more frames of media data for a single track at a given timecode.
+ * It supports multiple lacing modes (Xiph, EBML, and fixed-size) for packing
+ * multiple frames into a single block. This class handles parsing the block header,
+ * extracting lace sizes, and providing access to individual frames.
+ * </p>
+ *
+ * @see SimpleBlock
+ * @see Frame
+ * @see LaceMode
+ */
 public class Block {
 	private static final Logger LOG = LoggerFactory.getLogger(Block.class);
 
@@ -37,15 +50,22 @@ public class Block {
 	private boolean keyFrame;
 	private final ByteBuffer data;
 
+	/**
+	 * Constructs a Block from raw binary data.
+	 *
+	 * @param data the raw block data including header and frame payload
+	 */
 	public Block(final ByteBuffer data) {
 		LOG.trace("Block created with data {}, {}", data.limit(), data.position());
 		this.data = data;
 	}
 
-	// public void readData(DataSource source) {
-	// parseBlock();
-	// }
-
+	/**
+	 * Parses the block header to extract the track number, timecode, key frame flag,
+	 * lacing mode, and individual frame sizes.
+	 *
+	 * @throws RuntimeException if an unsupported lacing type is encountered
+	 */
 	public void parseBlock() {
 		int index = 0;
 		this.trackNo = (int) Reader.readEBMLCode(this.data);
@@ -152,6 +172,11 @@ public class Block {
 		return laceSizes;
 	}
 
+	/**
+	 * Returns the number of frames contained in this block.
+	 *
+	 * @return the frame count (1 if no lacing is used, otherwise the number of laced frames)
+	 */
 	public int getFrameCount() {
 		if (this.sizes == null) {
 			return 1;
@@ -159,6 +184,13 @@ public class Block {
 		return this.sizes.length;
 	}
 
+	/**
+	 * Returns the data of a specific frame within this block.
+	 *
+	 * @param frame the zero-based index of the frame to retrieve
+	 * @return a {@link ByteBuffer} containing the frame data
+	 * @throws IllegalArgumentException if {@code frame} is greater than 0 on a non-laced block
+	 */
 	public ByteBuffer getFrame(final int frame) {
 		int startOffset = this.headerSize;
 		int endOffset;
@@ -183,22 +215,39 @@ public class Block {
 		return frameData;
 	}
 
+	/**
+	 * Computes the absolute timecode of this block by adding the cluster timecode to the block-relative timecode.
+	 *
+	 * @param clusterTimecode the timecode of the containing cluster
+	 * @param timecodeScale the timecode scale (currently unused in the calculation)
+	 * @return the adjusted absolute timecode
+	 */
 	public long getAdjustedBlockTimecode(final long clusterTimecode, final long timecodeScale) {
 		return clusterTimecode + (this.blockTimecode); // * timecodeScale);
 	}
 
+	/** Returns the track number this block belongs to. */
 	public int getTrackNo() {
 		return this.trackNo;
 	}
 
+	/** Returns the block-relative timecode (offset from the cluster timecode). */
 	public int getBlockTimecode() {
 		return this.blockTimecode;
 	}
 
+	/**
+	 * Sets the frame data for this block (currently not implemented).
+	 *
+	 * @param trackNo the track number
+	 * @param timecode the timecode
+	 * @param data the raw frame data
+	 */
 	public void setFrameData(final short trackNo, final int timecode, final byte[] data) {
 
 	}
 
+	/** Returns {@code true} if this block contains a key frame. */
 	public boolean isKeyFrame() {
 		return this.keyFrame;
 	}

@@ -19,12 +19,6 @@
  */
 package org.atriasoft.jimbe.ebml.model;
 
-/*
- * Element.java
- *
- * Created on November 19, 2002, 9:11 PM
- */
-
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -35,9 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Defines the basic EBML element. Subclasses may provide child element access.
+ * Base class for all EBML elements. An element consists of an ID (type), a size, and optional data.
+ * Subclasses specialize behavior for different EBML data types (binary, string, integer, float, etc.).
  *
- * @author John Cannon
+ * <p>Also provides static utility methods for EBML size encoding/decoding and integer packing.</p>
  */
 public class Element {
 	protected static final Logger LOG = LoggerFactory.getLogger(Element.class);
@@ -51,15 +46,22 @@ public class Element {
 	protected boolean dataRead = false;
 	private Long headersSize = null;
 
-	/** Creates a new instance of Element */
+	/**
+	 * Creates an element with the specified type ID.
+	 *
+	 * @param type the EBML element ID bytes
+	 */
 	public Element(final byte[] type) {
 		this.type = ByteBuffer.wrap(type);
 	}
 
+	/** Creates an empty element. Type and size must be set before use. */
 	public Element() {}
 
 	/**
-	 * Read the element data
+	 * Reads the element's data payload from the data source into an internal buffer.
+	 *
+	 * @param source the data source to read from
 	 */
 	public void readData(final DataSource source) {
 		// Setup a buffer for it's data
@@ -73,7 +75,9 @@ public class Element {
 	}
 
 	/**
-	 * Skip the element data
+	 * Skips the element's data payload in the data source without reading it.
+	 *
+	 * @param source the data source to skip in
 	 */
 	public void skipData(final DataSource source) {
 		if (!this.dataRead) {
@@ -83,13 +87,22 @@ public class Element {
 		}
 	}
 
+	/**
+	 * Writes the complete element (header + data) to the output.
+	 *
+	 * @param writer the data writer to write to
+	 * @return the total number of bytes written
+	 */
 	public long writeElement(final DataWriter writer) {
 		LOG.trace("Writing element {} with size {}", this.typeInfo.getName(), getTotalSize());
 		return writeHeaderData(writer) + writeData(writer);
 	}
 
 	/**
-	 * Write the element header data. Override this in sub-classes for more specialized writing.
+	 * Writes the element header (type ID + encoded size) to the output.
+	 *
+	 * @param writer the data writer to write to
+	 * @return the number of header bytes written
 	 */
 	public long writeHeaderData(final DataWriter writer) {
 
@@ -111,7 +124,11 @@ public class Element {
 	}
 
 	/**
-	 * Write the element data. Override this in sub-classes for more specialized writing.
+	 * Writes the element's data payload to the output.
+	 *
+	 * @param writer the data writer to write to
+	 * @return the number of data bytes written
+	 * @throws NullPointerException if no data has been set
 	 */
 	public long writeData(final DataWriter writer) {
 		if (this.data == null) {
@@ -128,20 +145,18 @@ public class Element {
 	}
 
 	/**
-	 * Getter for property data.
+	 * Returns a duplicate of the element's data buffer.
 	 *
-	 * @return Value of property data.
-	 *
+	 * @return a duplicate of the data buffer
 	 */
 	public ByteBuffer getData() {
 		return this.data.duplicate();
 	}
 
 	/**
-	 * Setter for property data.
+	 * Sets the element's data buffer and updates the size accordingly.
 	 *
-	 * @param data New value of property data.
-	 *
+	 * @param data the data buffer to set
 	 */
 	public void setData(final ByteBuffer data) {
 		this.data = data;
@@ -149,27 +164,25 @@ public class Element {
 	}
 
 	/**
-	 * Clears the data of this element, useful if you just want this element to be a placeholder
+	 * Clears the data buffer. Useful for placeholder elements that only carry type/size info.
 	 */
 	public void clearData() {
 		this.data = null;
 	}
 
 	/**
-	 * Getter for property size.
+	 * Returns the data payload size in bytes (excluding the header).
 	 *
-	 * @return Value of property size.
-	 *
+	 * @return the data size
 	 */
 	public long getSize() {
 		return this.size;
 	}
 
 	/**
-	 * Setter for property size.
+	 * Sets the data payload size. Invalidates the cached header size.
 	 *
-	 * @param size New value of property size.
-	 *
+	 * @param size the data size in bytes
 	 */
 	public void setSize(final long size) {
 		// Clear headersSize because it is no longer valid.
@@ -178,7 +191,9 @@ public class Element {
 	}
 
 	/**
-	 * Get the total size of this element
+	 * Returns the total size of this element (header + data).
+	 *
+	 * @return the total size in bytes
 	 */
 	public long getTotalSize() {
 		long totalSize = 0;
@@ -194,87 +209,132 @@ public class Element {
 	}
 
 	/**
-	 * Getter for property type.
+	 * Returns a duplicate of the element's type ID buffer.
 	 *
-	 * @return Value of property type.
-	 *
+	 * @return a duplicate of the type ID bytes
 	 */
 	public ByteBuffer getType() {
 		return this.type.duplicate();
 	}
 
 	/**
-	 * Setter for property type.
+	 * Sets the element's type ID from a byte array.
 	 *
-	 * @param type New value of property type.
-	 *
+	 * @param type the EBML element ID bytes
 	 */
 	public void setType(final byte[] type) {
 		this.type = ByteBuffer.wrap(type);
 	}
 
 	/**
-	 * Setter for property type.
+	 * Sets the element's type ID from a buffer.
 	 *
-	 * @param type New value of property type.
-	 *
+	 * @param type the EBML element ID buffer
 	 */
 	public void setType(final ByteBuffer type) {
 		this.type = type;
 	}
 
+	/**
+	 * Sets the prototype descriptor for this element.
+	 *
+	 * @param typeInfo the prototype that describes this element's type
+	 */
 	public void setElementType(final ProtoType<?> typeInfo) {
 		this.typeInfo = typeInfo;
 	}
 
+	/**
+	 * Returns the prototype descriptor for this element.
+	 *
+	 * @return the prototype, or {@code null} for unknown elements
+	 */
 	public ProtoType<?> getElementType() {
 		return this.typeInfo;
 	}
 
+	/**
+	 * Sets whether this element's data has been read or skipped.
+	 *
+	 * @param dataRead {@code true} if the data has been consumed
+	 */
 	public void setDataRead(final boolean dataRead) {
 		this.dataRead = dataRead;
 	}
 
 	/**
-	 * Getter for property parent.
+	 * Returns the parent element in the EBML hierarchy.
 	 *
-	 * @return Value of property parent.
-	 *
+	 * @return the parent element, or {@code null} if this is a top-level element
 	 */
 	public Element getParent() {
 		return this.parent;
 	}
 
 	/**
-	 * Setter for property parent.
+	 * Sets the parent element in the EBML hierarchy.
 	 *
-	 * @param parent New value of property parent.
-	 *
+	 * @param parent the parent element
 	 */
 	public void setParent(final Element parent) {
 		this.parent = parent;
 	}
 
+	/**
+	 * Checks whether this element's type ID matches the given bytes.
+	 *
+	 * @param typeId the type ID bytes to compare against
+	 * @return {@code true} if the types match
+	 */
 	public boolean isType(final byte[] typeId) {
 		return Arrays.equals(this.type.array(), typeId);
 	}
 
+	/**
+	 * Checks whether this element's type ID matches the given buffer.
+	 *
+	 * @param typeId the type ID buffer to compare against
+	 * @return {@code true} if the types match
+	 */
 	public boolean isType(final ByteBuffer typeId) {
 		return typeId.equals(this.type);
 	}
 
+	/**
+	 * Sets the global minimum number of bytes used for EBML size encoding.
+	 *
+	 * @param minSize the minimum size length (0 for no minimum)
+	 */
 	public static void setMinSizeLength(final int minSize) {
 		minSizeLength = minSize;
 	}
 
+	/**
+	 * Returns the global minimum number of bytes used for EBML size encoding.
+	 *
+	 * @return the minimum size length
+	 */
 	public static int getMinSizeLength() {
 		return minSizeLength;
 	}
 
+	/**
+	 * Encodes a size value into EBML variable-length format.
+	 *
+	 * @param size the size to encode
+	 * @return the encoded bytes with VINT marker bit
+	 */
 	public static byte[] makeEbmlCodedSize(final long size) {
 		return makeEbmlCodedSize(size, 0);
 	}
 
+	/**
+	 * Encodes a size value into EBML variable-length format with a minimum byte count.
+	 *
+	 * @param size the size to encode
+	 * @param minSizeLen the minimum number of bytes to use (0 for no minimum)
+	 * @return the encoded bytes with VINT marker bit
+	 */
 	public static byte[] makeEbmlCodedSize(final long size, final int minSizeLen) {
 		final int len = codedSizeLength(size, minSizeLen);
 		final byte[] ret = new byte[len];
@@ -290,11 +350,23 @@ public class Element {
 		return ret;
 	}
 
+	/**
+	 * Returns the minimum number of bytes needed to represent a signed value.
+	 *
+	 * @param value the signed value
+	 * @return the minimum byte count (1-8)
+	 */
 	public static int getMinByteSize(final long value) {
 		final long absValue = Math.abs(value);
 		return getMinByteSizeUnsigned(absValue << 1);
 	}
 
+	/**
+	 * Returns the minimum number of bytes needed to represent an unsigned value.
+	 *
+	 * @param value the unsigned value
+	 * @return the minimum byte count (1-8)
+	 */
 	public static int getMinByteSizeUnsigned(final long value) {
 		int size = 8;
 		long mask = 0xFF00000000000000L;
@@ -309,6 +381,13 @@ public class Element {
 		return 8;
 	}
 
+	/**
+	 * Computes the number of bytes needed to EBML-encode a size value.
+	 *
+	 * @param value the size value to encode
+	 * @param minSizeLen the minimum byte count (0 for no minimum)
+	 * @return the number of bytes needed (1-4)
+	 */
 	public static int codedSizeLength(final long value, final int minSizeLen) {
 		int codedSize = 0;
 		if (value < 127) {
@@ -327,16 +406,35 @@ public class Element {
 		return codedSize;
 	}
 
+	/**
+	 * Packs an unsigned long into the minimum number of big-endian bytes.
+	 *
+	 * @param value the unsigned value to pack
+	 * @return the packed bytes
+	 */
 	public static byte[] packIntUnsigned(final long value) {
 		final int size = getMinByteSizeUnsigned(value);
 		return packInt(value, size);
 	}
 
+	/**
+	 * Packs a signed long into the minimum number of big-endian bytes.
+	 *
+	 * @param value the signed value to pack
+	 * @return the packed bytes
+	 */
 	public static byte[] packInt(final long value) {
 		final int size = getMinByteSize(value);
 		return packInt(value, size);
 	}
 
+	/**
+	 * Packs a long into a specified number of big-endian bytes.
+	 *
+	 * @param value the value to pack
+	 * @param size the number of bytes to use
+	 * @return the packed bytes
+	 */
 	public static byte[] packInt(final long value, final int size) {
 		final byte[] ret = new byte[size];
 		final long mask = 0x00000000000000FFL;
@@ -348,6 +446,12 @@ public class Element {
 		return ret;
 	}
 
+	/**
+	 * Caches the actual header size as read from the stream. This avoids recomputing
+	 * the size encoding length when calculating {@link #getTotalSize()}.
+	 *
+	 * @param headersSize the header size in bytes (type ID + encoded size)
+	 */
 	public void setHeadersSize(final long headersSize) {
 		this.headersSize = headersSize;
 	}

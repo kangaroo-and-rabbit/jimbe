@@ -21,11 +21,21 @@ package org.atriasoft.jimbe.ebml.model;
 
 import java.nio.ByteBuffer;
 
+/**
+ * EBML element containing a floating-point value. Supports 32-bit (float) and 64-bit (double)
+ * IEEE 754 representations. The size is chosen automatically based on the value's magnitude.
+ */
 public class FloatElement extends BinaryElement {
+	/**
+	 * Creates a float element with the specified type ID.
+	 *
+	 * @param type the EBML element ID bytes
+	 */
 	public FloatElement(final byte[] type) {
 		super(type);
 	}
 
+	/** Creates an empty float element. */
 	public FloatElement() {}
 
 	/**

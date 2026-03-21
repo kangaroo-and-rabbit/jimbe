@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Jimbe API Overview</title>
+</head>
+<body>
+
+<h1>Jimbe &mdash; Java EBML/Matroska Library</h1>
+
+<p>
+    Jimbe is a Java library for reading and writing
+    <a href="https://www.matroska.org/technical/specs/index.html">EBML</a> (Extensible Binary Meta Language)
+    and <a href="https://www.matroska.org/">Matroska</a>/WebM container files.
+    It provides both a low-level EBML element API and a high-level Matroska API with
+    track management, frame-level random access, seeking, and metadata support.
+</p>
+
+<h2>Architecture</h2>
+
+<p>The library is organized into five packages:</p>
+
+<table class="striped">
+    <caption>Package overview</caption>
+    <tr>
+        <th>Package</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>{@link org.atriasoft.jimbe.io}</td>
+        <td>I/O interfaces ({@link org.atriasoft.jimbe.io.DataSource},
+            {@link org.atriasoft.jimbe.io.DataWriter}) and file-based implementations.
+            Pluggable: implement these interfaces to read/write from custom sources.</td>
+    </tr>
+    <tr>
+        <td>{@link org.atriasoft.jimbe.ebml}</td>
+        <td>Low-level EBML reader and writer. Handles variable-length integer encoding,
+            element ID resolution, and raw element serialization.</td>
+    </tr>
+    <tr>
+        <td>{@link org.atriasoft.jimbe.ebml.model}</td>
+        <td>EBML element type hierarchy: {@link org.atriasoft.jimbe.ebml.model.Element},
+            {@link org.atriasoft.jimbe.ebml.model.MasterElement},
+            {@link org.atriasoft.jimbe.ebml.model.BinaryElement},
+            {@link org.atriasoft.jimbe.ebml.model.StringElement},
+            {@link org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement}, etc.
+            Also contains {@link org.atriasoft.jimbe.ebml.model.ProtoType} for element registration.</td>
+    </tr>
+    <tr>
+        <td>{@link org.atriasoft.jimbe.matroska}</td>
+        <td>High-level Matroska/WebM API. {@link org.atriasoft.jimbe.matroska.Reader} parses
+            files and provides frame-by-frame access with seeking.
+            {@link org.atriasoft.jimbe.matroska.Writer} creates Matroska files with tracks,
+            clusters, and cue points.</td>
+    </tr>
+    <tr>
+        <td>{@link org.atriasoft.jimbe.matroska.model}</td>
+        <td>Matroska data model: {@link org.atriasoft.jimbe.matroska.model.Track},
+            {@link org.atriasoft.jimbe.matroska.model.Frame},
+            {@link org.atriasoft.jimbe.matroska.model.Cluster},
+            {@link org.atriasoft.jimbe.matroska.model.DocTypes}, and more.</td>
+    </tr>
+</table>
+
+<h2>Getting Started</h2>
+
+<h3>Maven Dependency</h3>
+<pre>{@code
+<dependency>
+    <groupId>org.atria-soft</groupId>
+    <artifactId>jimbe</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+}</pre>
+
+<h3>Reading a Matroska File</h3>
+<pre>{@code
+FileDataSource source = new FileDataSource("video.mkv");
+Reader reader = new Reader(source);
+reader.readFile();
+
+// List tracks
+for (Track track : reader.getTrackList()) {
+    System.out.println(track);
+}
+
+// Read frames sequentially
+Frame frame;
+while ((frame = reader.getNextFrame()) != null) {
+    System.out.printf("Track %d, timecode %d, %d bytes%n",
+        frame.getTrackNo(), frame.getTimecode(), frame.getData().remaining());
+}
+}</pre>
+
+<h3>Reading Frames from a Specific Track</h3>
+<pre>{@code
+Frame frame;
+while ((frame = reader.getNextFrame(1)) != null) {
+    // Process only track 1 frames
+}
+}</pre>
+
+<h3>Seeking</h3>
+<pre>{@code
+if (reader.isSeekable()) {
+    long actualTimecode = reader.seek(5000); // Seek to 5000ms
+    Frame frame = reader.getNextFrame();     // First frame at or after seek point
+}
+}</pre>
+
+<h3>Getting File Metadata</h3>
+<pre>{@code
+System.out.println("Title: " + reader.getSegmentTitle());
+System.out.println("Muxing app: " + reader.getMuxingApp());
+System.out.println("Writing app: " + reader.getWritingApp());
+System.out.println("Timecode scale: " + reader.getTimecodeScale());
+System.out.println(reader.getReport()); // Full file summary
+}</pre>
+
+<h3>Writing a Matroska File</h3>
+<pre>{@code
+FileDataWriter output = new FileDataWriter("output.mkv");
+Writer writer = new Writer(output);
+
+// Define a track
+Track track = new Track();
+track.setTrackNo(1);
+track.setTrackType(TrackType.SUBTITLE);
+track.setCodecID("S_TEXT/UTF8");
+track.setDefaultDuration(1000);
+writer.addTrack(track);
+
+// Write frames
+Frame frame = new Frame();
+frame.setTrackNo(1);
+frame.setTimecode(0);
+frame.setData(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8)));
+writer.addFrame(frame);
+
+writer.close();
+output.close();
+}</pre>
+
+<h3>Writing with a Video Track</h3>
+<pre>{@code
+Track videoTrack = new Track();
+videoTrack.setTrackNo(1);
+videoTrack.setTrackType(TrackType.VIDEO);
+videoTrack.setCodecID("V_VP8");
+videoTrack.setDefaultDuration(33333333L); // ~30fps in nanoseconds
+
+VideoTrack videoInfo = new VideoTrack();
+videoInfo.setPixelWidth((short) 1920);
+videoInfo.setPixelHeight((short) 1080);
+videoTrack.setVideo(videoInfo);
+
+writer.addTrack(videoTrack);
+}</pre>
+
+<h3>Low-level EBML Access</h3>
+<pre>{@code
+FileDataSource source = new FileDataSource("file.mkv");
+org.atriasoft.jimbe.ebml.Reader reader = new org.atriasoft.jimbe.ebml.Reader(source);
+
+Element element = reader.readNextElement();
+while (element != null) {
+    System.out.printf("Element: %s, size: %d%n",
+        element.getElementType().getName(), element.getSize());
+
+    if (element instanceof MasterElement master) {
+        Element child = master.readNextChild(reader);
+        // traverse children...
+    }
+    element.skipData(source);
+    element = reader.readNextElement();
+}
+}</pre>
+
+<h2>Requirements</h2>
+<p>Java 21 or later.</p>
+
+<h2>License</h2>
+<p>LGPL v2 &mdash; see <a href="https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html">LGPL v2</a>.</p>
+
+</body>
+</html>

@@ -35,13 +35,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * <p>Matroska Track Class </p>
- * <p>Mandatory fields are:
+ * <p>Mandatory fields are:</p>
  * <ul>
  *    <li>Track Type</li>
  *    <li>Codec ID</li>
  *    <li>Default duration</li>
  * </ul>
- * </p>
  * <p>Note that if the TrackType is Audio, you must add the AudioTrack member. Likewise VideoTrack for Video.</p>
  */
 public class Track {
@@ -115,6 +114,15 @@ public class Track {
 		return s.toString();
 	}
 
+	/**
+	 * Parses a Track from an EBML TrackEntry element, reading all sub-elements
+	 * including video and audio properties.
+	 *
+	 * @param level2 the TrackEntry master element
+	 * @param ioDS the data source to read element data from
+	 * @param reader the EBML reader for parsing child elements
+	 * @return the parsed Track instance
+	 */
 	public static Track fromElement(final Element level2, final DataSource ioDS, final Reader reader) {
 		// TODO: read all possible elements
 		Element level3 = ((MasterElement) level2).readNextChild(reader);
@@ -347,158 +355,201 @@ public class Track {
 		return trackEntryElem;
 	}
 
+	/** Returns the track number. */
 	public int getTrackNo() {
 		return this.trackNo;
 	}
 
+	/** Sets the track number. */
 	public void setTrackNo(final int trackNo) {
 		this.trackNo = trackNo;
 	}
 
+	/** Returns the unique track identifier. */
 	public long getTrackUID() {
 		return this.trackUID;
 	}
 
+	/** Sets the unique track identifier. */
 	public void setTrackUID(final long trackUID) {
 		this.trackUID = trackUID;
 	}
 
+	/** Returns the type of this track (video, audio, subtitle, etc.). */
 	public TrackType getTrackType() {
 		return this.trackType;
 	}
 
+	/** Sets the type of this track. */
 	public void setTrackType(final TrackType trackType) {
 		this.trackType = trackType;
 	}
 
+	/** Returns {@code true} if this track is enabled. */
 	public boolean isFlagEnabled() {
 		return this.flagEnabled;
 	}
 
+	/** Sets whether this track is enabled. */
 	public void setFlagEnabled(final boolean flagEnabled) {
 		this.flagEnabled = flagEnabled;
 	}
 
+	/** Returns {@code true} if this track is the default track for its type. */
 	public boolean isFlagDefault() {
 		return this.flagDefault;
 	}
 
+	/** Sets whether this track is the default track for its type. */
 	public void setFlagDefault(final boolean flagDefault) {
 		this.flagDefault = flagDefault;
 	}
 
+	/** Returns {@code true} if this track is forced (must be displayed). */
 	public boolean isFlagForced() {
 		return this.flagForced;
 	}
 
+	/** Sets whether this track is forced. */
 	public void setFlagForced(final boolean flagForced) {
 		this.flagForced = flagForced;
 	}
 
+	/** Returns {@code true} if lacing is enabled for this track. */
 	public boolean isFlagLacing() {
 		return this.flagLacing;
 	}
 
+	/** Sets whether lacing is enabled for this track. */
 	public void setFlagLacing(final boolean flagLacing) {
 		this.flagLacing = flagLacing;
 	}
 
+	/** Returns the minimum cache size hint for this track. */
 	public int getMinCache() {
 		return this.minCache;
 	}
 
+	/** Sets the minimum cache size hint for this track. */
 	public void setMinCache(final int minCache) {
 		this.minCache = minCache;
 	}
 
+	/** Returns the maximum BlockAdditional ID used in this track. */
 	public int getMaxBlockAdditionalId() {
 		return this.maxBlockAdditionalId;
 	}
 
+	/** Sets the maximum BlockAdditional ID used in this track. */
 	public void setMaxBlockAdditionalId(final int maxBlockAdditionalId) {
 		this.maxBlockAdditionalId = maxBlockAdditionalId;
 	}
 
+	/** Returns the human-readable name of this track. */
 	public String getName() {
 		return this.name;
 	}
 
+	/** Sets the human-readable name of this track. */
 	public void setName(final String name) {
 		this.name = name;
 	}
 
+	/** Returns the language code of this track (e.g., "eng"). */
 	public String getLanguage() {
 		return this.language;
 	}
 
+	/** Sets the language code of this track. */
 	public void setLanguage(final String language) {
 		this.language = language;
 	}
 
+	/** Returns the codec identifier string (e.g., "V_VP9", "A_OPUS"). */
 	public String getCodecID() {
 		return this.codecID;
 	}
 
+	/** Sets the codec identifier string. */
 	public void setCodecID(final String codecID) {
 		this.codecID = codecID;
 	}
 
+	/** Returns the codec-specific private data, or {@code null} if not set. */
 	public ByteBuffer getCodecPrivate() {
 		return this.codecPrivate;
 	}
 
+	/** Sets the codec-specific private data. */
 	public void setCodecPrivate(final ByteBuffer codecPrivate) {
 		this.codecPrivate = codecPrivate;
 	}
 
+	/** Returns the default duration of each frame in nanoseconds. */
 	public long getDefaultDuration() {
 		return this.defaultDuration;
 	}
 
+	/** Sets the default duration of each frame in nanoseconds. */
 	public void setDefaultDuration(final long defaultDuration) {
 		this.defaultDuration = defaultDuration;
 	}
 
+	/** Returns {@code true} if the codec can decode all frames independently. */
 	public boolean isCodecDecodeAll() {
 		return this.codecDecodeAll;
 	}
 
+	/** Sets whether the codec can decode all frames independently. */
 	public void setCodecDecodeAll(final boolean codecDecodeAll) {
 		this.codecDecodeAll = codecDecodeAll;
 	}
 
+	/** Returns the seek pre-roll duration in nanoseconds. */
 	public int getSeekPreroll() {
 		return this.seekPreroll;
 	}
 
+	/** Sets the seek pre-roll duration in nanoseconds. */
 	public void setSeekPreroll(final int seekPreroll) {
 		this.seekPreroll = seekPreroll;
 	}
 
+	/** Returns the video track properties, or {@code null} if this is not a video track. */
 	public VideoTrack getVideo() {
 		return this.video;
 	}
 
+	/** Sets the video track properties. */
 	public void setVideo(final VideoTrack video) {
 		this.video = video;
 	}
 
+	/** Returns the audio track properties, or {@code null} if this is not an audio track. */
 	public AudioTrack getAudio() {
 		return this.audio;
 	}
 
+	/** Sets the audio track properties. */
 	public void setAudio(final AudioTrack audio) {
 		this.audio = audio;
 	}
 
+	/** Returns the track operation (combine/join), or {@code null} if not set. */
 	public TrackOperation getOperation() {
 		return this.operation;
 	}
 
+	/** Sets the track operation (combine/join). */
 	public void setOperation(final TrackOperation operation) {
 		this.operation = operation;
 	}
 
+	/**
+	 * Adds a track overlay UID. Track overlays define tracks that should be combined during playback.
+	 *
+	 * @param overlay the UID of the overlay track
+	 */
 	public void addTrackOverlay(final long overlay) {
 		this.overlayUids.add(overlay);
 	}

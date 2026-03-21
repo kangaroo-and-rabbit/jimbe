@@ -33,40 +33,28 @@ public class Frame {
 	private static final Logger LOG = LoggerFactory.getLogger(Frame.class);
 
 	private int trackNo;
-	/**
-	 * A timecode, it should be in ms
-	 */
+	/** The presentation timecode in milliseconds. */
 	private long timecode;
-	/**
-	 * The duration of this frame, it should also be in ms
-	 */
+	/** The duration of this frame in milliseconds, or {@link Long#MIN_VALUE} if unset. */
 	private long duration = Long.MIN_VALUE;
 
-	/**
-	 * List of references
-	 */
+	/** List of timecode references to other frames (for non-keyframe dependencies). */
 	private ArrayList<Long> references = new ArrayList<>();
-	/**
-	 * The frame data
-	 */
+	/** The raw frame data payload. */
 	private ByteBuffer data;
 	private boolean keyFrame;
 
-	/**
-	 * MatroskaFrame Default constructor
-	 */
+	/** Constructs an empty frame with no data or timecode set. */
 	public Frame() {
 		this.references = new ArrayList<>();
-		// System.out.println("new " + this);
 	}
 
 	/**
-	 * MatroskaFrame Copy constructor
+	 * Copy constructor that duplicates all properties from another frame.
 	 *
-	 * @param copy MatroskaFrame to copy
+	 * @param copy the frame to copy
 	 */
 	public Frame(final Frame copy) {
-		// System.out.println("MatroskaFrame copy " + this);
 		this.trackNo = copy.trackNo;
 		setTimecode(copy.getTimecode());
 		setDuration(copy.getDuration());
@@ -79,43 +67,43 @@ public class Frame {
 		}
 	}
 
-	/**
-	 * @return true if this is a key frame
-	 */
+	/** Returns {@code true} if this is a key frame. */
 	public boolean isKeyFrame() {
 		return this.keyFrame;
 	}
 
 	/**
-	 * @param keyFrame true if this is a key frame
+	 * Sets whether this frame is a key frame.
+	 *
+	 * @param keyFrame {@code true} if this is a key frame
 	 */
 	public void setKeyFrame(final boolean keyFrame) {
 		this.keyFrame = keyFrame;
 	}
 
-	/**
-	 * @return The track this frame belongs to
-	 */
+	/** Returns the track number this frame belongs to. */
 	public int getTrackNo() {
 		return this.trackNo;
 	}
 
 	/**
-	 * @param trackNo The track this frame belongs to
+	 * Sets the track number this frame belongs to.
+	 *
+	 * @param trackNo the track number
 	 */
 	public void setTrackNo(final int trackNo) {
 		this.trackNo = trackNo;
 	}
 
-	/**
-	 * @return The list of frames that this frame references
-	 */
+	/** Returns the list of timecode references to other frames. */
 	public ArrayList<Long> getReferences() {
 		return this.references;
 	}
 
 	/**
-	 * @param references Some frames that this frame references, added to the list.
+	 * Adds one or more frame references (timecodes of frames this frame depends on).
+	 *
+	 * @param references the timecode references to add
 	 */
 	public void addReferences(final long... references) {
 		for (final Long ref : references) {
@@ -123,43 +111,43 @@ public class Frame {
 		}
 	}
 
-	/**
-	 * @return the presentation timecode that this frame is associated with
-	 */
+	/** Returns the presentation timecode in milliseconds. */
 	public long getTimecode() {
 		return this.timecode;
 	}
 
 	/**
-	 * @param timecode the presentation timecode that this frame is associated with
+	 * Sets the presentation timecode in milliseconds.
+	 *
+	 * @param timecode the timecode value
 	 */
 	public void setTimecode(final long timecode) {
 		this.timecode = timecode;
 	}
 
-	/**
-	 * @return duration of this frame
-	 */
+	/** Returns the duration of this frame in milliseconds, or {@link Long#MIN_VALUE} if unset. */
 	public long getDuration() {
 		return this.duration;
 	}
 
 	/**
-	 * @param duration duration of this frame
+	 * Sets the duration of this frame in milliseconds.
+	 *
+	 * @param duration the duration value
 	 */
 	public void setDuration(final long duration) {
 		this.duration = duration;
 	}
 
-	/**
-	 * @return the data contained in this frame.
-	 */
+	/** Returns a duplicate of the data buffer contained in this frame. */
 	public ByteBuffer getData() {
 		return this.data.duplicate();
 	}
 
 	/**
-	 * @param data the data associated with this frame
+	 * Sets the data payload for this frame (the buffer is duplicated internally).
+	 *
+	 * @param data the frame data buffer
 	 */
 	public void setData(final ByteBuffer data) {
 		LOG.trace("Setting data with size {}", data.remaining());

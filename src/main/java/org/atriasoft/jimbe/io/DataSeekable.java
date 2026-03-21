@@ -20,32 +20,36 @@
 package org.atriasoft.jimbe.io;
 
 /**
- * Interface for seeking operations. Not designed to be used alone but as a super interface for a more specialied reading or writing interfaces.
+ * Base interface for seekable data access. Provides position, length, and seeking capabilities.
+ * Not designed to be used alone but as a super interface for {@link DataSource} and {@link DataWriter}.
  */
 public interface DataSeekable {
 	/**
-	 * Returns the length
+	 * Returns the total length of the data.
 	 *
-	 * @return <code>-1</code> if the length is unknown
-	 * @return <code> >0</code> length of the <code>DataSeekable</code>
+	 * @return the length in bytes, or {@code -1} if unknown
 	 */
 	long length();
 
+	/**
+	 * Returns the current position in the data.
+	 *
+	 * @return the current byte offset from the beginning
+	 */
 	long getFilePointer();
 
 	/**
-	 * Check if the <code>DataSeekable</code> object is seekable
+	 * Checks whether this data source supports seeking.
 	 *
-	 * @return <code>true</code> if seeking is supported.
-	 * @return <code>false</code> if seeking is not supported.
+	 * @return {@code true} if seeking is supported, {@code false} otherwise
 	 */
 	boolean isSeekable();
 
 	/**
-	 * Seeks in the <code>DataSeekable</code>
+	 * Seeks to an absolute position.
 	 *
-	 * @param pos Absolute position to seek to
-	 * @return The new file position
+	 * @param pos the absolute byte position to seek to
+	 * @return the new position after seeking
 	 */
 	long seek(long pos);
 }

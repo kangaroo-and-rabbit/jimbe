@@ -10,6 +10,15 @@ import org.atriasoft.jimbe.io.DataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Represents the Matroska SeekHead element, which indexes the positions of level-1 elements
+ * within a Segment for fast seeking.
+ * <p>
+ * The MetaSeek reserves space in the output stream when first written, allowing subsequent
+ * additions of indexed elements. After adding new entries, the {@link #update(DataWriter)}
+ * method seeks back and rewrites the SeekHead in place.
+ * </p>
+ */
 public class MetaSeek {
 	private static final Logger LOG = LoggerFactory.getLogger(MetaSeek.class);
 	private static final long BLOCK_RESERVE_SIZE = 256;
@@ -19,10 +28,9 @@ public class MetaSeek {
 	private final long referencePosition;
 
 	/**
-	 * Creates a MetaSeek object to index the positions of various other level 1 objects.
+	 * Creates a MetaSeek object to index the positions of level-1 elements.
 	 *
-	 * @param doc
-	 * @param referencePosition The first byte after the first Segment element in the file
+	 * @param referencePosition the byte position of the first byte after the Segment element header
 	 */
 	public MetaSeek(final long referencePosition) {
 		this.referencePosition = referencePosition;
@@ -73,12 +81,11 @@ public class MetaSeek {
 	}
 
 	/**
-	 * Adds elements to the seek index. These should be level 1 objects only. If this object has already been written, you must use the update() method
-	 * for changes to take effect.
+	 * Adds an element to the seek index by its raw type bytes. These should be level-1 elements only.
+	 * If this object has already been written, use {@link #update(DataWriter)} for changes to take effect.
 	 *
-	 * @param element The element itself
-	 * @param filePosition Position in the data stream where the element has been written.
-	 * @return
+	 * @param elementType the raw EBML element type ID bytes
+	 * @param filePosition the absolute byte position where the element was written
 	 */
 	public void addIndexedElement(final ByteBuffer elementType, final long filePosition) {
 		LOG.debug("Adding indexed element @ {}", filePosition - this.referencePosition);

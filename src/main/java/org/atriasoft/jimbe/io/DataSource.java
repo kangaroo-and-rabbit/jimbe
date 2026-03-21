@@ -21,33 +21,32 @@ package org.atriasoft.jimbe.io;
 
 import java.nio.ByteBuffer;
 
-/*
- * DataSource.java
- *
- * Created on November 18, 2002, 4:08 PM
- */
-
 /**
- * Defines the interface used for custom <code>DataSource</code>'s. A <code>DataSource</code> provides methods of reading bytes individually or in
- * arrays. These basic functions must be defined in any <code>DataSource</code> objects to be used with the <code>Reader</code>.
- *
- * @author John Cannon
- * @author Jory Stone
+ * Interface for reading bytes from a data source. Extends {@link DataSeekable} to combine
+ * read and seek operations. Used by the EBML {@link org.atriasoft.jimbe.ebml.Reader} to parse elements.
  */
-
 public interface DataSource extends DataSeekable {
 
+	/**
+	 * Reads a single byte from the data source.
+	 *
+	 * @return the byte read
+	 */
 	byte readByte();
 
+	/**
+	 * Reads bytes into the given buffer.
+	 *
+	 * @param buff the buffer to read into
+	 * @return the number of bytes read
+	 */
 	int read(ByteBuffer buff);
 
-	// int read(ByteBuffer buff, int length);
-
 	/**
-	 * Skip a number of bytes in the <code>DataSeekable</code>
+	 * Skips a number of bytes in the data source.
 	 *
-	 * @param offset The number of bytes to skip
-	 * @return The number of bytes skipped
+	 * @param offset the number of bytes to skip
+	 * @return the number of bytes actually skipped
 	 */
 	long skip(long offset);
 }

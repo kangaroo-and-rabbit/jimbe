@@ -18,37 +18,41 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/*
- * Element.java
- *
- *
- */
-
 package org.atriasoft.jimbe.ebml.model;
 
 /**
- * Defines the basic EBML element. Subclasses may provide child element access. Created on November 19, 2002, 9:11 PM
- *
- * @author John Cannon
+ * EBML element containing raw binary data. Serves as the default element type for
+ * unknown elements and as the base class for typed elements (string, integer, float, etc.).
  */
 public class BinaryElement extends Element {
 	private static int minSizeLength = 4;
 
-	/*
-	 * Creates a new instance of Element
+	/**
+	 * Creates a binary element with the specified type ID.
 	 *
-	 * @param type The type ID of this element
+	 * @param type the EBML element ID bytes
 	 */
 	public BinaryElement(final byte[] type) {
 		super(type);
 	}
 
+	/** Creates an empty binary element. */
 	public BinaryElement() {}
 
+	/**
+	 * Sets the minimum number of bytes used for EBML size encoding for binary elements.
+	 *
+	 * @param minSize the minimum size length
+	 */
 	public static void setMinSizeLength(final int minSize) {
 		minSizeLength = minSize;
 	}
 
+	/**
+	 * Returns the minimum number of bytes used for EBML size encoding for binary elements.
+	 *
+	 * @return the minimum size length
+	 */
 	public static int getMinSizeLength() {
 		return minSizeLength;
 	}

@@ -26,17 +26,29 @@ import org.atriasoft.jimbe.ebml.model.MasterElement;
 import org.atriasoft.jimbe.io.DataWriter;
 
 /**
- * Summary description for Segment.
+ * Represents the top-level Matroska Segment element.
+ * <p>
+ * The Segment is the root container for all Matroska data (tracks, clusters, cues, etc.).
+ * It extends {@link MasterElement} and adds support for writing the element size as
+ * "unknown" (all 1-bits), which is required for streaming or when the final size
+ * is not known in advance.
+ * </p>
  */
 public class Segment extends MasterElement {
 	protected boolean bUnknownSize = false;
 
+	/** Constructs a Segment element with the standard Matroska Segment type ID. */
 	public Segment() {
 		super(DocTypes.Segment.getType().array());
 	}
 
 	/**
-	 * Write the element header data. The override will write the size as unknown if the flag is set.
+	 * Writes the element header (type ID and size) to the output.
+	 * If the unknown size flag is set, the size field is filled with all 1-bits
+	 * to indicate an indeterminate length.
+	 *
+	 * @param writer the data writer to write the header to
+	 * @return the number of bytes written
 	 */
 	@Override
 	public long writeHeaderData(final DataWriter writer) {
@@ -64,15 +76,16 @@ public class Segment extends MasterElement {
 	}
 
 	/**
-	 * Setter for Unknown Size flag. This is a special case for ebml. The size value is filled with 1's.
+	 * Sets the unknown size flag. When enabled, the element size is written as
+	 * indeterminate (all 1-bits), which is used for streaming scenarios.
+	 *
+	 * @param bUnknownSize {@code true} to write an unknown/indeterminate size
 	 */
 	public void setUnknownSize(final boolean bUnknownSize) {
 		this.bUnknownSize = bUnknownSize;
 	}
 
-	/**
-	 * Getter for Unknown Size flag.
-	 */
+	/** Returns {@code true} if this segment will be written with an indeterminate size. */
 	public boolean getUnknownSize() {
 		return this.bUnknownSize;
 	}

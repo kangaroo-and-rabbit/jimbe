@@ -22,15 +22,25 @@ package org.atriasoft.jimbe.ebml.model;
 import java.nio.ByteBuffer;
 import java.util.Date;
 
+/**
+ * EBML element containing a date value. Dates are stored as nanoseconds since
+ * 2001-01-01T00:00:00 UTC (the EBML epoch), encoded as an 8-byte signed integer.
+ */
 public class DateElement extends SignedIntegerElement {
 	// const uint64 EbmlDate::UnixEpochDelay = 978307200; // 2001/01/01 00:00:00 UTC
 	public static final long UnixEpochDelay = 978307200; // 2001/01/01 00:00:00 UTC
 	private static final int MIN_SIZE_LENGTH = 8;
 
+	/**
+	 * Creates a date element with the specified type ID.
+	 *
+	 * @param type the EBML element ID bytes
+	 */
 	public DateElement(final byte[] type) {
 		super(type);
 	}
 
+	/** Creates an empty date element. */
 	public DateElement() {}
 
 	/**

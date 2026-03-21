@@ -50,7 +50,9 @@ public class Writer {
 	private final Tracks tracks;
 
 	/**
-	 * @param outputDataWriter DataWriter to write out to.
+	 * Creates a new Matroska writer. Immediately writes the EBML header and segment header.
+	 *
+	 * @param outputDataWriter the data writer to write to
 	 */
 	public Writer(final DataWriter outputDataWriter) {
 		this.ioDW = outputDataWriter;
@@ -119,19 +121,30 @@ public class Writer {
 		this.tracks.update(this.ioDW);
 	}
 
+	/**
+	 * Returns the timecode scale in nanoseconds per timecode unit.
+	 *
+	 * @return the timecode scale (default 1,000,000 = 1ms)
+	 */
 	public long getTimecodeScale() {
 		return this.segmentInfoElem.getTimecodeScale();
 	}
 
 	/**
-	 * Sets the time scale used in this file. This is the number of nanoseconds represented by the timecode unit in frames. Defaults to 1,000,000.
+	 * Sets the timecode scale. This is the number of nanoseconds per timecode unit.
+	 * Defaults to 1,000,000 (1ms per unit).
 	 *
-	 * @param timecodeScale
+	 * @param timecodeScale the timecode scale in nanoseconds
 	 */
 	public void setTimecodeScale(final long timecodeScale) {
 		this.segmentInfoElem.setTimecodeScale(timecodeScale);
 	}
 
+	/**
+	 * Returns the file duration.
+	 *
+	 * @return the duration in timecode scale units
+	 */
 	public double getDuration() {
 		return this.segmentInfoElem.getDuration();
 	}
@@ -139,30 +152,35 @@ public class Writer {
 	/**
 	 * Sets the duration of the file. Optional.
 	 *
-	 * @param duration
+	 * @param duration the duration in timecode scale units
 	 */
 	public void setDuration(final double duration) {
 		this.segmentInfoElem.setDuration(duration);
 	}
 
 	/**
-	 * Adds a track to the file. You may add tracks at any time before close()ing, even after adding frames for the track.
+	 * Adds a track to the file. Tracks can be added at any time before {@link #close()},
+	 * even after adding frames for the track.
 	 *
-	 * @param track
+	 * @param track the track to add
 	 */
 	public void addTrack(final Track track) {
 		this.tracks.addTrack(track);
 	}
 
 	/**
-	 * Adds the silent track notation for the given track to subsequent clusters, note that this has little effect on most players
+	 * Marks a track as silent in subsequent clusters.
+	 *
+	 * @param trackNumber the track number to silence
 	 */
 	public void silenceTrack(final long trackNumber) {
 		this.cluster.silenceTrack(trackNumber);
 	}
 
 	/**
-	 * Removes the silent track notation for this track
+	 * Removes the silent track notation for a track.
+	 *
+	 * @param trackNumber the track number to unsilence
 	 */
 	public void unsilenceTrack(final long trackNumber) {
 		this.cluster.unsilenceTrack(trackNumber);

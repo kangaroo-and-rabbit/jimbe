@@ -25,15 +25,34 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+/**
+ * File-based implementation of {@link DataSource}. Uses {@link RandomAccessFile} and {@link FileChannel}
+ * for efficient reading and seeking within files. Implements {@link AutoCloseable} for resource management.
+ */
 public class FileDataSource implements DataSource, AutoCloseable {
-	RandomAccessFile file = null;
-	FileChannel fc = null;
+	private RandomAccessFile file = null;
+	private FileChannel fc = null;
 
+	/**
+	 * Opens a file for reading.
+	 *
+	 * @param filename the path to the file to read
+	 * @throws FileNotFoundException if the file does not exist
+	 * @throws IOException if an I/O error occurs
+	 */
 	public FileDataSource(final String filename) throws FileNotFoundException, IOException {
 		this.file = new RandomAccessFile(filename, "r");
 		this.fc = this.file.getChannel();
 	}
 
+	/**
+	 * Opens a file with a specified access mode.
+	 *
+	 * @param filename the path to the file
+	 * @param mode the access mode (e.g. "r" for read-only, "rw" for read-write)
+	 * @throws FileNotFoundException if the file does not exist
+	 * @throws IOException if an I/O error occurs
+	 */
 	public FileDataSource(final String filename, final String mode) throws FileNotFoundException, IOException {
 		this.file = new RandomAccessFile(filename, mode);
 		this.fc = this.file.getChannel();

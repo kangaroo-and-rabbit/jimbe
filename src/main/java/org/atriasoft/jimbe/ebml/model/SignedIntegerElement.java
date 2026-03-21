@@ -21,25 +21,29 @@ package org.atriasoft.jimbe.ebml.model;
 
 import java.nio.ByteBuffer;
 
-/*
- * SignedInteger.java
- *
- * Created on February 17, 2003, 1:54 PM
- */
-
 /**
- * Basic class for the Signed Integer EBML data type.
- *
- * @author John Cannon
+ * EBML element containing a signed integer value. The value is stored in big-endian
+ * format using the minimum number of bytes needed.
  */
 public class SignedIntegerElement extends BinaryElement {
 
+	/**
+	 * Creates a signed integer element with the specified type ID.
+	 *
+	 * @param typeID the EBML element ID bytes
+	 */
 	public SignedIntegerElement(final byte[] typeID) {
 		super(typeID);
 	}
 
+	/** Creates an empty signed integer element. */
 	public SignedIntegerElement() {}
 
+	/**
+	 * Sets the signed integer value.
+	 *
+	 * @param value the value to set
+	 */
 	public void setValue(final long value) {
 		// System.out.println(Long.toHexString(value));
 		setData(ByteBuffer.wrap(packInt(value)));
@@ -48,6 +52,11 @@ public class SignedIntegerElement extends BinaryElement {
 		 */
 	}
 
+	/**
+	 * Returns the signed integer value.
+	 *
+	 * @return the decoded signed value
+	 */
 	public long getValue() {
 		final byte[] dataArray = this.data.array();
 		long l = 0;

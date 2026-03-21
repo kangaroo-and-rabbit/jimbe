@@ -25,15 +25,34 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+/**
+ * File-based implementation of {@link DataWriter}. Uses {@link RandomAccessFile} and {@link FileChannel}
+ * for efficient writing and seeking within files.
+ */
 public class FileDataWriter implements DataWriter {
-	RandomAccessFile file = null;
-	FileChannel fc = null;
+	private RandomAccessFile file = null;
+	private FileChannel fc = null;
 
+	/**
+	 * Opens a file for reading and writing.
+	 *
+	 * @param filename the path to the file to write
+	 * @throws FileNotFoundException if the file does not exist and cannot be created
+	 * @throws IOException if an I/O error occurs
+	 */
 	public FileDataWriter(final String filename) throws FileNotFoundException, IOException {
 		this.file = new RandomAccessFile(filename, "rw");
 		this.fc = this.file.getChannel();
 	}
 
+	/**
+	 * Opens a file with a specified access mode.
+	 *
+	 * @param filename the path to the file
+	 * @param mode the access mode (e.g. "rw" for read-write)
+	 * @throws FileNotFoundException if the file does not exist and cannot be created
+	 * @throws IOException if an I/O error occurs
+	 */
 	public FileDataWriter(final String filename, final String mode) throws FileNotFoundException, IOException {
 		this.file = new RandomAccessFile(filename, mode);
 		this.fc = this.file.getChannel();

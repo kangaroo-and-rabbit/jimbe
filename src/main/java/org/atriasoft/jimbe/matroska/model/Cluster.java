@@ -47,18 +47,26 @@ public class Cluster {
 	private int totalSize = 0;
 	private long durationLimit = Long.MAX_VALUE;
 
+	/** Constructs an empty cluster with no size or duration limits. */
 	public Cluster() {}
 
+	/**
+	 * Sets the maximum duration and size limits for this cluster.
+	 * When either limit is exceeded, {@link #addFrame(Frame)} returns {@code false}.
+	 *
+	 * @param duration the maximum duration span of frames in the cluster
+	 * @param size the maximum total data size in bytes
+	 */
 	public void setLimitParameters(final long duration, final int size) {
 		this.sizeLimit = size;
 		this.durationLimit = duration;
 	}
 
 	/**
-	 * Add a frame to the cluster
+	 * Adds a frame to the cluster.
 	 *
-	 * @param frame
-	 * @return false if you should begin another cluster.
+	 * @param frame the frame to add
+	 * @return {@code false} if the cluster limits have been exceeded and a new cluster should be started
 	 */
 	public boolean addFrame(final Frame frame) {
 		// Is this the earliest timecode?
@@ -71,6 +79,13 @@ public class Cluster {
 		return ((frame.getTimecode() - this.clusterTimecode) < this.durationLimit) && (this.totalSize < this.sizeLimit);
 	}
 
+	/**
+	 * Writes all accumulated frames as a Matroska Cluster element to the output,
+	 * then clears the internal state for reuse.
+	 *
+	 * @param ioDW the data writer to write the cluster to
+	 * @return the number of bytes written, or 0 if the cluster was empty
+	 */
 	public long flush(final DataWriter ioDW) {
 		if (this.frames.size() == 0) {
 			return 0;
@@ -121,18 +136,31 @@ public class Cluster {
 		}
 	}
 
+	/** Returns the timecode of this cluster (the earliest frame timecode). */
 	public long getClusterTimecode() {
 		return this.clusterTimecode;
 	}
 
+	/** Returns the set of track numbers that have frames in this cluster. */
 	public Collection<Integer> getTracks() {
 		return this.tracks;
 	}
 
+	/**
+	 * Removes a track from the silent tracks list.
+	 *
+	 * @param trackNumber the track number to unsilence
+	 */
 	public void unsilenceTrack(final long trackNumber) {
 		this.sliencedTracks.remove(trackNumber);
 	}
 
+	/**
+	 * Adds a track to the silent tracks list. Silent tracks are written in the
+	 * cluster header to indicate tracks that have no data in this cluster.
+	 *
+	 * @param trackNumber the track number to silence
+	 */
 	public void silenceTrack(final long trackNumber) {
 		this.sliencedTracks.add(trackNumber);
 	}

@@ -23,22 +23,26 @@ import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.io.DataWriter;
 
 /**
- * Summary description for Writer.
+ * EBML element writer. Serializes {@link Element} instances (header + data) to a {@link DataWriter} sink.
  */
 public class Writer {
 	protected DataWriter writer;
 
 	/**
-	 * Creates a new <code>Reader</code> reading from the <code>DataSource
-	 * source</code>. The <code>DocType doc</code> is used to validate the document.
+	 * Creates a new EBML writer.
 	 *
-	 * @param source DataSource to read from
-	 * @param doc DocType to use to validate the docment
+	 * @param writer the data sink to write to
 	 */
 	public Writer(final DataWriter writer) {
 		this.writer = writer;
 	}
 
+	/**
+	 * Writes a complete EBML element (header and data) to the output.
+	 *
+	 * @param elem the element to write
+	 * @return the total number of bytes written (header + data)
+	 */
 	public long writeElement(final Element elem) {
 		return elem.writeHeaderData(this.writer) + elem.writeData(this.writer);
 	}

@@ -21,6 +21,12 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.util.ArrayList;
 
+/**
+ * Represents a Matroska Tag element, which groups a set of target UIDs
+ * (tracks, chapters, attachments) with their associated {@link Tag} (SimpleTag) entries.
+ *
+ * @see Tag
+ */
 public class TagEntry {
 	public ArrayList<Long> trackUID = new ArrayList<>();
 	public ArrayList<Long> chapterUID = new ArrayList<>();

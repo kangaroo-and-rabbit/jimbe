@@ -4,15 +4,24 @@ import org.atriasoft.jimbe.ebml.model.BinaryElement;
 import org.atriasoft.jimbe.ebml.model.DateElement;
 import org.atriasoft.jimbe.ebml.model.FloatElement;
 import org.atriasoft.jimbe.ebml.model.MasterElement;
-/** Matroska spec generated element list document
-    Do not manually edit this file.
-*/
 import org.atriasoft.jimbe.ebml.model.ProtoType;
 import org.atriasoft.jimbe.ebml.model.SignedIntegerElement;
 import org.atriasoft.jimbe.ebml.model.StringElement;
 import org.atriasoft.jimbe.ebml.model.UTF8StringElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 
+/**
+ * Static declarations of all Matroska EBML element type prototypes.
+ * <p>
+ * Each field defines a {@link ProtoType} for a specific Matroska element, including its
+ * name, binary element ID, and nesting level in the Matroska hierarchy. These prototypes
+ * are used throughout the library to create element instances for reading and writing
+ * Matroska containers.
+ * </p>
+ * <p>
+ * This is a utility class and cannot be instantiated.
+ * </p>
+ */
 public final class DocTypes {
 
 	public static final ProtoType<MasterElement> EBML = new ProtoType<>(MasterElement.class, "EBML",

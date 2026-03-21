@@ -29,45 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reader.java
+ * EBML element reader. Reads element headers (id + size) from a {@link DataSource}, resolves them
+ * via {@link ProtoType}, and returns typed {@link Element} instances ready for data consumption.
  *
- * Created on November 18, 2002, 4:03 PM
- *
- * @version 1.0
- */
-
-/**
- * <h1>JEBML Intro</h1>
- * <hr>
- * <p>
- * The following are the basic steps of how reading in JEBML works.
- * </p>
- * <ul>
- * <li>1. The EbmlReader class reads the element header (id+size) and looks it up in the supplied DocType class.
- * <li>2. The correct element type (Binary, UInteger, String, etc) is created using the DocType data, BinaryElement is default element type for
- * unknown elements.
- * <li>3. The MatroskaDocType has the ids of all the elements staticly declared. <br>
- * So to easily find out what an element is, you can use some code like the following code
- * <p>
- * <code>
- * Element level1; <br>
- * // ... fill level1 <br>
- * if (level1.equals(MatroskaDocType.SegmentInfo_Id)) { <br>
- *   // Your Code Here <br>
- * } <br>
- * </code>
- * </p>
- * <li>4. To get the actual data for an Element you call the readData method, if you just want to skip it use skipData().
- * <li>5. MasterElements are special, they have the readNextChild() method which returns the next child element, returning null when all the children
- * have been read (it keeps track of the current inputstream position).
- * <li>The usage method for JEBML is very close to libebml/libmatroska.
- * </ul>
- * <hr>
- *
- * Reads EBML elements from a <code>DataSource</code> and looks them up in the provided <code>DocType</code>.
- *
- * @author (c) 2002 John Cannon
- * @author (c) 2004 Jory Stone
+ * <p>Also provides static utility methods for EBML variable-length integer encoding/decoding
+ * used throughout the library.</p>
  */
 public class Reader {
 	private static final Logger LOG = LoggerFactory.getLogger(Reader.class);
@@ -76,16 +42,20 @@ public class Reader {
 	protected DataSource source;
 
 	/**
-	 * Creates a new <code>Reader</code> reading from the <code>DataSource
-	 * source</code>. The <code>DocType doc</code> is used to validate the document.
+	 * Creates a new EBML reader.
 	 *
-	 * @param source DataSource to read from
-	 * @param doc DocType to use to validate the docment
+	 * @param source the data source to read from
 	 */
 	public Reader(final DataSource source) {
 		this.source = source;
 	}
 
+	/**
+	 * Converts a byte array to its hexadecimal string representation.
+	 *
+	 * @param bytes the bytes to convert
+	 * @return uppercase hex string (two characters per byte)
+	 */
 	public static String bytesToHex(final byte[] bytes) {
 		final char[] hexChars = new char[bytes.length * 2];
 		for (int j = 0; j < bytes.length; j++) {
@@ -96,6 +66,13 @@ public class Reader {
 		return new String(hexChars);
 	}
 
+	/**
+	 * Reads the next EBML element from the data source. Parses the element id and size,
+	 * resolves the element type via {@link ProtoType}, and returns the corresponding typed element.
+	 * Unknown elements are skipped and returned as {@link BinaryElement} placeholders.
+	 *
+	 * @return the next element, or {@code null} if the end of the stream is reached
+	 */
 	public Element readNextElement() {
 		// Read the type.
 		final long position = this.source.getFilePointer();
@@ -154,6 +131,13 @@ public class Reader {
 		return elem;
 	}
 
+	/**
+	 * Reads an EBML variable-length code from the data source and returns it with the leading
+	 * length bits stripped. The result contains only the payload bits of the VINT.
+	 *
+	 * @param source the data source to read from
+	 * @return a buffer containing the code bytes (without VINT marker bit), or {@code null} on failure
+	 */
 	public static ByteBuffer getEBMLCodeAsBytes(final DataSource source) {
 		// Begin loop with byte set to newly read byte.
 		final byte firstByte = source.readByte();
@@ -179,6 +163,13 @@ public class Reader {
 		return buf;
 	}
 
+	/**
+	 * Determines the number of bytes in an EBML variable-length integer from its first byte.
+	 * The position of the first set bit (from the MSB) indicates the total byte count.
+	 *
+	 * @param firstByte the first byte of the EBML code
+	 * @return the total number of bytes (1-8), or {@code 0} if invalid
+	 */
 	public static int readEBMLCodeSize(final byte firstByte) {
 		int numBytes = 0;
 		// Begin by counting the bits unset before the first '1'.
@@ -198,10 +189,10 @@ public class Reader {
 	}
 
 	/**
-	 * Reads an (Unsigned) EBML code from the DataSource and encodes it into a long. This size should be cast into an int for actual use as Java only
-	 * allows upto 32-bit file I/O operations.
+	 * Reads an unsigned EBML variable-length integer from a {@link DataSource} and returns it as a long.
 	 *
-	 * @return ebml size
+	 * @param source the data source to read from
+	 * @return the decoded unsigned value, or {@code 0} if the code is invalid
 	 */
 	public static long readEBMLCode(final DataSource source) {
 		// Begin loop with byte set to newly read byte.
@@ -228,10 +219,11 @@ public class Reader {
 	}
 
 	/**
-	 * Takes a byte buffer and reads the bytes as an unsigned integer
+	 * Interprets the bytes in a buffer as an unsigned big-endian integer.
+	 * The buffer position is restored after reading.
 	 *
-	 * @param data
-	 * @return
+	 * @param data the buffer containing the EBML code bytes (without VINT marker bit)
+	 * @return the decoded unsigned value, or {@code 0} if the buffer is {@code null}
 	 */
 	public static long parseEBMLCode(final ByteBuffer data) {
 		if (data == null) {
@@ -251,10 +243,10 @@ public class Reader {
 	}
 
 	/**
-	 * Reads an (Unsigned) EBML code from the DataSource and encodes it into a long. This size should be cast into an int for actual use as Java only
-	 * allows upto 32-bit file I/O operations.
+	 * Reads an unsigned EBML variable-length integer from a {@link ByteBuffer} and returns it as a long.
 	 *
-	 * @return ebml size
+	 * @param source the buffer to read from
+	 * @return the decoded unsigned value, or {@code 0} if the code is invalid
 	 */
 	public static long readEBMLCode(final ByteBuffer source) {
 		// Begin loop with byte set to newly read byte.
@@ -281,10 +273,11 @@ public class Reader {
 	}
 
 	/**
-	 * Reads an Signed EBML code from the DataSource and encodes it into a long. This size should be cast into an int for actual use as Java only allows
-	 * upto 32-bit file I/O operations.
+	 * Reads a signed EBML variable-length integer from a {@link ByteBuffer}.
+	 * Applies the EBML sign offset based on the encoded byte count.
 	 *
-	 * @return ebml size
+	 * @param source the buffer to read from
+	 * @return the decoded signed value, or {@code 0} if the code is invalid
 	 */
 	public static long readSignedEBMLCode(final ByteBuffer source) {
 		// Begin loop with byte set to newly read byte.
@@ -328,10 +321,11 @@ public class Reader {
 	}
 
 	/**
-	 * Reads an Signed EBML code from the DataSource and encodes it into a long. This size should be cast into an int for actual use as Java only allows
-	 * upto 32-bit file I/O operations.
+	 * Reads a signed EBML variable-length integer from a {@link DataSource}.
+	 * Applies the EBML sign offset based on the encoded byte count.
 	 *
-	 * @return ebml size
+	 * @param source the data source to read from
+	 * @return the decoded signed value, or {@code 0} if the code is invalid
 	 */
 	public static long readSignedEBMLCode(final DataSource source) {
 
@@ -376,9 +370,11 @@ public class Reader {
 	}
 
 	/**
-	 * Reads an EBML code from the DataSource.
+	 * Reads an EBML variable-length code from the data source and returns the raw bytes
+	 * including the VINT marker bit. Used for reading element IDs.
 	 *
-	 * @return byte array filled with the ebml size, (size bits included)
+	 * @param source the data source to read from
+	 * @return a buffer containing the raw code bytes, or {@code null} on failure
 	 */
 	public static ByteBuffer readEBMLCodeAsBytes(final DataSource source) {
 		// Begin loop with byte set to newly read byte.

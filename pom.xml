@@ -2,11 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.atria-soft</groupId>
-	<artifactId>jebml2</artifactId>
-	<name>jebml2</name>
-	<version>3.0.1-SNAPSHOT</version>
-	<description>EBML (Extensible Binary Meta Language) library for Java with Matroska/WebM support.</description>
-	<url>https://github.com/kangaroo-and-rabbit/jebml</url>
+	<artifactId>jimbe</artifactId>
+	<name>jimbe</name>
+	<version>1.0.0-SNAPSHOT</version>
+	<description>Jimbe is e refactor of jebml that port in jave the EBML (Extensible Binary Meta Language) and Matroska/WebM.</description>
+	<url>https://github.com/kangaroo-and-rabbit/jimbe</url>
 	<licenses>
 		<license>
 			<name>GNU Library General Public License v2</name>
@@ -16,7 +16,7 @@
 	</licenses>
 	<developers>
 		<developer>
-			<id>dev1</id>
+			<id>dev_refacto</id>
 			<name>Edouard DUPIN</name>
 			<email>edouard.dupin@proton.me</email>
 			<roles>
@@ -24,18 +24,26 @@
 			</roles>
 		</developer>
 		<developer>
-			<id>dev_matroska</id>
-			<name>Steve Lhomme</name>
-			<email>slhomme@matroska.org</email>
+			<id>dev_port_java</id>
+			<name>Jory Stone</name>
+			<email>jebml@jory.info</email>
 			<roles>
-				<role>Original integrator on git</role>
+				<role>port on Java of ebml</role>
+			</roles>
+		</developer>
+		<developer>
+			<id>dev_ebml</id>
+			<name>John Cannon</name>
+			<email>spyder@matroska.org</email>
+			<roles>
+				<role>Original port of ebml</role>
 			</roles>
 		</developer>
 	</developers>
 	<scm>
-		<url>https://github.com/kangaroo-and-rabbit/jebml</url>
-		<connection>scm:git:git://github.com/kangaroo-and-rabbit/jebml.git</connection>
-		<developerConnection>scm:git:ssh:github.com/kangaroo-and-rabbit/jebml.git</developerConnection>
+		<url>https://github.com/kangaroo-and-rabbit/jimbe</url>
+		<connection>scm:git:git://github.com/kangaroo-and-rabbit/jimbe.git</connection>
+		<developerConnection>scm:git:ssh:github.com/kangaroo-and-rabbit/jimbe.git</developerConnection>
 	</scm>
 	<dependencies>
 		<!-- Logging API -->
@@ -135,6 +143,9 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>3.12.0</version>
+				<configuration>
+					<overview>${project.basedir}/src/main/javadoc/overview.html</overview>
+				</configuration>
 				<executions>
 					<execution>
 						<id>attach-javadocs</id>

@@ -42,9 +42,16 @@ import org.atriasoft.jimbe.matroska.model.Track;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * High-level Matroska/WebM file reader. Parses the EBML header, segment info, tracks, tags,
+ * and clusters, providing frame-by-frame access with optional seeking.
+ *
+ * <p>Usage: construct with a {@link DataSource}, call {@link #readFile()}, then iterate
+ * with {@link #getNextFrame()} or {@link #getNextFrame(int)}.</p>
+ */
 public class Reader {
 	/**
-	 * Number of Clusters to search before assuming that a track has ended
+	 * Number of Clusters to search before assuming that a track has ended.
 	 */
 	public static final int CLUSTER_TRACK_SEARCH_COUNT = 4;
 	protected static final Logger LOG = LoggerFactory.getLogger(Reader.class);
@@ -219,67 +226,24 @@ public class Reader {
 		return frame;
 	}
 
+	/**
+	 * Checks whether seeking is supported by the underlying data source.
+	 *
+	 * @return {@code true} if seeking is supported
+	 */
 	public boolean isSeekable() {
 		return this.ioDS.isSeekable();
 	}
 
 	/**
-	 * Seek to the requested timecode, rescaning clusters and/or discarding frames until we reach the nearest possible timecode, rounded down.
+	 * Seeks to the requested timecode by rescanning clusters and discarding frames
+	 * until reaching the nearest timecode less than or equal to the requested one.
 	 *
-	 * <p>
-	 * For example<br>
-	 * Say we have a file with 10 frames
-	 * <table>
-	 * <tr>
-	 * <th>Frame No</th>
-	 * <th>Timecode</th>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 1</td>
-	 * <td>0ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 2</td>
-	 * <td>50ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 3</td>
-	 * <td>100ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 4</td>
-	 * <td>150ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 5</td>
-	 * <td>200ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 6</td>
-	 * <td>250ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 7</td>
-	 * <td>300ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 8</td>
-	 * <td>350ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 9</td>
-	 * <td>400ms</td>
-	 * </tr>
-	 * <tr>
-	 * <td>Frame 10</td>
-	 * <td>450ms</td>
-	 * </tr>
-	 * </table>
-	 * We are requested to seek to 333ms, so we discard frames until we hit an timecode larger than the requested. We would seek to Frame 7 at 300ms.
-	 * </p>
+	 * <p>For example, if frames exist at 0ms, 50ms, 100ms, ... 450ms and we seek to 333ms,
+	 * the seek lands on Frame 7 at 300ms (the last frame with timecode &lt;= 333ms).</p>
 	 *
-	 * @param timecode Timecode to seek to in millseconds
-	 * @return Actual timecode we seeked to
+	 * @param timecode timecode to seek to in milliseconds
+	 * @return the actual timecode reached, or {@code 0} if no frame was found
 	 */
 	public long seek(final long timecode) {
 		if (this.level0 == null) {
@@ -607,6 +571,11 @@ public class Reader {
 		return s.getBuffer().toString();
 	}
 
+	/**
+	 * Returns the writing application string from the segment info.
+	 *
+	 * @return the writing application name, or {@code null} if not present
+	 */
 	public String getWritingApp() {
 		return this.writingApp;
 	}
@@ -659,10 +628,20 @@ public class Reader {
 		return this.timecodeScale;
 	}
 
+	/**
+	 * Returns the segment title from the file metadata.
+	 *
+	 * @return the segment title, or {@code null} if not present
+	 */
 	public String getSegmentTitle() {
 		return this.segmentTitle;
 	}
 
+	/**
+	 * Returns the muxing application string from the segment info.
+	 *
+	 * @return the muxing application name, or {@code null} if not present
+	 */
 	public String getMuxingApp() {
 		return this.muxingApp;
 	}

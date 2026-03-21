@@ -21,11 +21,23 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.util.ArrayList;
 
+/**
+ * Represents a Matroska SimpleTag element, consisting of a name/value pair
+ * with optional nested child tags.
+ *
+ * @see TagEntry
+ */
 public class Tag {
 	public String name;
 	public String value;
 	public ArrayList<Tag> children = new ArrayList<>();
 
+	/**
+	 * Returns a string representation of this tag and its children, indented to the given depth.
+	 *
+	 * @param depth the indentation depth (number of tab levels)
+	 * @return the formatted string representation
+	 */
 	public String toString(int depth) {
 		StringBuilder s = new StringBuilder().append(new String());
 		String depthIndent = new String();

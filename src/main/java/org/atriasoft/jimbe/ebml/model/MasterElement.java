@@ -25,16 +25,34 @@ import org.atriasoft.jimbe.ebml.Reader;
 import org.atriasoft.jimbe.io.DataSource;
 import org.atriasoft.jimbe.io.DataWriter;
 
+/**
+ * EBML element that contains child elements. A master element acts as a container in the
+ * EBML hierarchy, tracking how many bytes of its children have been consumed during reading.
+ */
 public class MasterElement extends Element {
 	protected long usedSize = 0;
 	protected ArrayList<Element> children = new ArrayList<>();
 
+	/**
+	 * Creates a master element with the specified type ID.
+	 *
+	 * @param type the EBML element ID bytes
+	 */
 	public MasterElement(final byte[] type) {
 		super(type);
 	}
 
+	/** Creates an empty master element. */
 	public MasterElement() {}
 
+	/**
+	 * Reads the next child element from this master element's content.
+	 * Returns {@code null} when all children have been consumed.
+	 * Unknown child elements are automatically skipped.
+	 *
+	 * @param reader the EBML reader to read from
+	 * @return the next child element, or {@code null} if all children have been read
+	 */
 	public Element readNextChild(final Reader reader) {
 		if (this.usedSize >= getSize()) {
 			LOG.trace("Can't read any more children");
@@ -79,6 +97,11 @@ public class MasterElement extends Element {
 		return len;
 	}
 
+	/**
+	 * Adds a child element for writing. Updates this element's size to include the child.
+	 *
+	 * @param elem the child element to add
+	 */
 	public void addChildElement(final Element elem) {
 		this.children.add(elem);
 		this.size += elem.getTotalSize();

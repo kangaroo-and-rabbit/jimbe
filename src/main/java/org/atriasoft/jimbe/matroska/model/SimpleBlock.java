@@ -12,6 +12,19 @@ import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Builds and serializes a Matroska SimpleBlock or BlockGroup element for writing.
+ * <p>
+ * A SimpleBlock is the most common way to store frame data in a Matroska cluster.
+ * When a duration is specified, the block is written as a BlockGroup instead.
+ * This class handles frame accumulation, lacing mode selection, and binary
+ * encoding of the block header and payload.
+ * </p>
+ *
+ * @see Block
+ * @see Frame
+ * @see LaceMode
+ */
 public class SimpleBlock {
 	private static final Logger LOG = LoggerFactory.getLogger(SimpleBlock.class);
 
@@ -28,10 +41,17 @@ public class SimpleBlock {
 
 	private long duration = Long.MIN_VALUE;
 
+	/** Constructs an empty SimpleBlock with default settings. */
 	public SimpleBlock() {
 
 	}
 
+	/**
+	 * Converts this block to the appropriate EBML element.
+	 * Returns a SimpleBlock element if no duration is set, otherwise a BlockGroup.
+	 *
+	 * @return the EBML {@link Element} representing this block
+	 */
 	public Element toElement() {
 		if (isSimpleBlock()) {
 			return toSimpleBlock();
@@ -39,12 +59,22 @@ public class SimpleBlock {
 		return toBlockGroup();
 	}
 
+	/**
+	 * Creates a SimpleBlock EBML element from the accumulated frames.
+	 *
+	 * @return a {@link BinaryElement} representing the SimpleBlock
+	 */
 	public Element toSimpleBlock() {
 		final BinaryElement blockElem = DocTypes.SimpleBlock.getInstance();
 		blockElem.setData(createInnerData());
 		return blockElem;
 	}
 
+	/**
+	 * Creates a BlockGroup EBML element containing the block data and its duration.
+	 *
+	 * @return a {@link MasterElement} representing the BlockGroup
+	 */
 	public Element toBlockGroup() {
 		final MasterElement blockGroupElem = DocTypes.BlockGroup.getInstance();
 		final BinaryElement blockElem = DocTypes.Block.getInstance();
@@ -145,39 +175,59 @@ public class SimpleBlock {
 		return buf;
 	}
 
+	/** Returns the timecode of this block relative to the containing cluster. */
 	public long getTimecode() {
 		return this.timecode;
 	}
 
+	/**
+	 * Sets the timecode of this block relative to the containing cluster.
+	 *
+	 * @param timecode the timecode value (must fit in a {@code short})
+	 */
 	public void setTimecode(final long timecode) {
 		assert timecode < Short.MAX_VALUE;
 		this.timecode = (short) timecode;
 	}
 
+	/** Returns the lacing mode used for encoding multiple frames in this block. */
 	public LaceMode getLaceMode() {
 		return this.laceMode;
 	}
 
+	/** Sets the lacing mode for encoding multiple frames in this block. */
 	public void setLaceMode(final LaceMode laceMode) {
 		this.laceMode = laceMode;
 	}
 
+	/** Returns {@code true} if this block is marked as invisible (should not be rendered). */
 	public boolean isInvisible() {
 		return this.invisible;
 	}
 
+	/** Sets whether this block is invisible (should not be rendered). */
 	public void setInvisible(final boolean invisible) {
 		this.invisible = invisible;
 	}
 
+	/** Returns {@code true} if this block can be discarded during playback if needed. */
 	public boolean isDiscardable() {
 		return this.discardable;
 	}
 
+	/** Sets whether this block can be discarded during playback. */
 	public void setDiscardable(final boolean discardable) {
 		this.discardable = discardable;
 	}
 
+	/**
+	 * Adds a frame to this block. The block's timecode and track number are set
+	 * from the first frame added.
+	 *
+	 * @param frame the frame to add
+	 * @return {@code true} if more frames can be added to this block, {@code false} if
+	 *         a new block should be started (e.g., frame too large for lacing or max frames reached)
+	 */
 	public boolean addFrame(final Frame frame) {
 		LOG.trace("Adding frame {}", frame.getData().remaining());
 		setTimecode(frame.getTimecode());
@@ -197,30 +247,40 @@ public class SimpleBlock {
 		return !isSimpleBlock() || !(this.laceMode.equals(LaceMode.NONE) || this.frames.size() > 8);
 	}
 
+	/** Returns the track number that this block belongs to. */
 	public int getTrackNumber() {
 		return this.trackNumber;
 	}
 
+	/** Sets the track number that this block belongs to. */
 	public void setTrackNumber(final int trackNumber) {
 		this.trackNumber = trackNumber;
 	}
 
+	/** Returns {@code true} if this block contains a key frame. */
 	public boolean isKeyFrame() {
 		return this.keyFrame;
 	}
 
+	/** Sets whether this block contains a key frame. */
 	public void setKeyFrame(final boolean keyFrame) {
 		this.keyFrame = keyFrame;
 	}
 
+	/** Returns the duration of this block, or {@link Long#MIN_VALUE} if unset. */
 	public long getDuration() {
 		return this.duration;
 	}
 
+	/** Sets the duration of this block. Setting a duration causes it to be written as a BlockGroup. */
 	public void setDuration(final long duration) {
 		this.duration = duration;
 	}
 
+	/**
+	 * Returns {@code true} if this block should be written as a SimpleBlock (no duration set).
+	 * When a duration is present, it must be written as a BlockGroup instead.
+	 */
 	public boolean isSimpleBlock() {
 		return this.duration == Long.MIN_VALUE;
 	}

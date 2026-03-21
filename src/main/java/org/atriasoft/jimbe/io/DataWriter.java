@@ -22,13 +22,24 @@ package org.atriasoft.jimbe.io;
 import java.nio.ByteBuffer;
 
 /**
- * Defines the interface used for custom <code>DataWriter</code>'s. A <code>DataWriter</code> provides methods of writing bytes individually or in
- * arrays. These basic functions must be defined in any <code>DataWriter</code> objects to be used with the <code>Writer</code>.
- *
- * @author Jory Stone
+ * Interface for writing bytes to a data sink. Extends {@link DataSeekable} to combine
+ * write and seek operations. Used by the EBML {@link org.atriasoft.jimbe.ebml.Writer} to serialize elements.
  */
 public interface DataWriter extends DataSeekable {
+
+	/**
+	 * Writes a single byte.
+	 *
+	 * @param b the byte to write
+	 * @return the number of bytes written (1 on success, 0 on failure)
+	 */
 	int write(byte b);
 
+	/**
+	 * Writes the contents of a buffer.
+	 *
+	 * @param buff the buffer to write
+	 * @return the number of bytes written
+	 */
 	int write(ByteBuffer buff);
 }

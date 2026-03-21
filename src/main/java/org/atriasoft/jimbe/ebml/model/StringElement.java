@@ -24,39 +24,68 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Baisc class for handling an EBML string data type. This class encapsulates both UTF and ASCII string types and can use any string type supported by
- * the Java platform.
- *
- * @author John Cannon
+ * EBML element containing a string value. Supports any character encoding;
+ * defaults to US-ASCII. Use {@link UTF8StringElement} for UTF-8 strings.
  */
 public class StringElement extends BinaryElement {
 
 	private Charset charset = StandardCharsets.US_ASCII;
 
-	/** Creates a new instance of StringElement */
+	/**
+	 * Creates a string element with the specified type ID and ASCII encoding.
+	 *
+	 * @param typeID the EBML element ID bytes
+	 */
 	public StringElement(final byte[] typeID) {
 		super(typeID);
 	}
 
+	/** Creates an empty string element with ASCII encoding. */
 	public StringElement() {}
 
+	/**
+	 * Creates a string element with the specified type ID and encoding.
+	 *
+	 * @param typeID the EBML element ID bytes
+	 * @param encoding the character encoding to use
+	 */
 	public StringElement(final byte[] typeID, final Charset encoding) {
 		super(typeID);
 		this.charset = encoding;
 	}
 
+	/**
+	 * Creates an empty string element with the specified encoding.
+	 *
+	 * @param encoding the character encoding to use
+	 */
 	public StringElement(final Charset encoding) {
 		this.charset = encoding;
 	}
 
+	/**
+	 * Returns the string value decoded from the element's data.
+	 *
+	 * @return the string value
+	 */
 	public String getValue() {
 		return new String(this.data.array(), this.charset);
 	}
 
+	/**
+	 * Sets the string value, encoding it into the element's data buffer.
+	 *
+	 * @param value the string value to set
+	 */
 	public void setValue(final String value) {
 		setData(ByteBuffer.wrap(value.getBytes(this.charset)));
 	}
 
+	/**
+	 * Returns the character encoding used by this string element.
+	 *
+	 * @return the character encoding
+	 */
 	public Charset getEncoding() {
 		return this.charset;
 	}
