@@ -1,13 +1,11 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import org.atriasoft.jimbe.ebml.MockSource;
 import org.atriasoft.jimbe.ebml.Reader;
 import org.atriasoft.jimbe.ebml.model.Element;
-import org.atriasoft.jimbe.ebml.MockSource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +20,7 @@ public class EbmlElementTest {
 			Assertions.assertEquals(encoded.length, decoded);
 		}
 	}
-	
+
 	@Test
 	public void testMakeReadEbmlCode() {
 		final ByteBuffer buffer = ByteBuffer.allocate(1024);
@@ -30,13 +28,13 @@ public class EbmlElementTest {
 		for (int i = 0; i < 268435455; i += rnd.nextInt(42)) {
 			buffer.put(Element.makeEbmlCodedSize(i));
 			buffer.flip();
-			
+
 			final MockSource src = new MockSource(buffer);
 			Assertions.assertEquals(i, Reader.readEBMLCode(src));
 			buffer.clear();
 		}
 	}
-	
+
 	@Test
 	public void testMakeParseEbmlCode() {
 		final ByteBuffer buffer = ByteBuffer.allocate(32);

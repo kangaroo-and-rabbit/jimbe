@@ -1,9 +1,8 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.Element;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +42,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode1ByteMin() {
 		// Value 0: 0x80 = 10000000 -> value = 0
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x80});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x80 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(0, Reader.readEBMLCode(src));
 	}
@@ -52,14 +51,14 @@ public class VintTest {
 	public void testReadEBMLCode1ByteMax() {
 		// Max 1-byte value = 126: 0xFE = 11111110
 		// 0xFF = all-ones is reserved ("unknown size")
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xFE});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xFE });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(126, Reader.readEBMLCode(src));
 	}
 
 	@Test
 	public void testReadEBMLCode1ByteValue1() {
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x81});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x81 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(1, Reader.readEBMLCode(src));
 	}
@@ -67,7 +66,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode1ByteValue42() {
 		// 42 = 0x2A, with width marker: 0x80 | 0x2A = 0xAA
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xAA});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xAA });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(42, Reader.readEBMLCode(src));
 	}
@@ -77,7 +76,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode2ByteMin() {
 		// Value 0 in 2 bytes: 0x4000
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x40, (byte) 0x00});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x40, (byte) 0x00 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(0, Reader.readEBMLCode(src));
 	}
@@ -85,7 +84,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode2ByteValue128() {
 		// Value 128: 0x40 | (128 >> 8) = 0x40, 128 & 0xFF = 0x80
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x40, (byte) 0x80});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x40, (byte) 0x80 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(128, Reader.readEBMLCode(src));
 	}
@@ -93,7 +92,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode2ByteMax() {
 		// Max 2-byte value = 2^14 - 2 = 16382: 0x7FFE
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x7F, (byte) 0xFE});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x7F, (byte) 0xFE });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(16382, Reader.readEBMLCode(src));
 	}
@@ -102,7 +101,7 @@ public class VintTest {
 
 	@Test
 	public void testReadEBMLCode3ByteMin() {
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x20, (byte) 0x00, (byte) 0x00});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x20, (byte) 0x00, (byte) 0x00 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(0, Reader.readEBMLCode(src));
 	}
@@ -110,7 +109,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode3ByteMax() {
 		// Max 3-byte value = 2^21 - 2 = 2097150: 0x3F 0xFF 0xFE
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x3F, (byte) 0xFF, (byte) 0xFE});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x3F, (byte) 0xFF, (byte) 0xFE });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(2097150, Reader.readEBMLCode(src));
 	}
@@ -119,7 +118,7 @@ public class VintTest {
 
 	@Test
 	public void testReadEBMLCode4ByteMin() {
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x10, (byte) 0x00, (byte) 0x00, (byte) 0x00});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x10, (byte) 0x00, (byte) 0x00, (byte) 0x00 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(0, Reader.readEBMLCode(src));
 	}
@@ -127,7 +126,7 @@ public class VintTest {
 	@Test
 	public void testReadEBMLCode4ByteMax() {
 		// Max 4-byte value = 2^28 - 2 = 268435454: 0x1F 0xFF 0xFF 0xFE
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x1F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFE});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x1F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFE });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(268435454, Reader.readEBMLCode(src));
 	}
@@ -173,11 +172,10 @@ public class VintTest {
 
 	@Test
 	public void testVintRoundTripAllBoundaries() {
-		final long[] boundaryValues = {
-			0, 1, 126,           // 1-byte boundaries
-			127, 16382,          // 2-byte boundaries
-			16383, 2097150,      // 3-byte boundaries
-			2097151, 268435454   // 4-byte boundaries
+		final long[] boundaryValues = { 0, 1, 126, // 1-byte boundaries
+				127, 16382, // 2-byte boundaries
+				16383, 2097150, // 3-byte boundaries
+				2097151, 268435454 // 4-byte boundaries
 		};
 		for (final long v : boundaryValues) {
 			final byte[] encoded = Element.makeEbmlCodedSize(v);
@@ -190,7 +188,7 @@ public class VintTest {
 
 	@Test
 	public void testVintRoundTripFromByteBuffer() {
-		final long[] values = {0, 1, 42, 127, 1000, 16383, 100000, 2097151};
+		final long[] values = { 0, 1, 42, 127, 1000, 16383, 100000, 2097151 };
 		for (final long v : values) {
 			final byte[] encoded = Element.makeEbmlCodedSize(v);
 			final ByteBuffer buf = ByteBuffer.wrap(encoded);
@@ -228,7 +226,7 @@ public class VintTest {
 	public void testSignedEBMLCodeZero() {
 		// For 1-byte signed VINT, offset = 63
 		// To get value 0: raw = 63, encoded = 0x80|63 = 0xBF
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xBF});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xBF });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(0, Reader.readSignedEBMLCode(src));
 	}
@@ -236,7 +234,7 @@ public class VintTest {
 	@Test
 	public void testSignedEBMLCodePositive() {
 		// For 1-byte, offset=63. Value +10: raw=73 -> 0x80|73 = 0xC9
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xC9});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xC9 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(10, Reader.readSignedEBMLCode(src));
 	}
@@ -244,7 +242,7 @@ public class VintTest {
 	@Test
 	public void testSignedEBMLCodeNegative() {
 		// For 1-byte, offset=63. Value -63: raw=0 -> 0x80|0 = 0x80
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x80});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x80 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(-63, Reader.readSignedEBMLCode(src));
 	}
@@ -252,7 +250,7 @@ public class VintTest {
 	@Test
 	public void testSignedEBMLCodeMax1Byte() {
 		// For 1-byte, offset=63. Max value = 126-63 = 63: raw=126 -> 0x80|126 = 0xFE
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xFE});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xFE });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(63, Reader.readSignedEBMLCode(src));
 	}
@@ -262,21 +260,21 @@ public class VintTest {
 	@Test
 	public void testParseEBMLCodeSingleByte() {
 		// parseEBMLCode reads raw bytes without VINT markers
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{42});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { 42 });
 		Assertions.assertEquals(42, Reader.parseEBMLCode(buf));
 	}
 
 	@Test
 	public void testParseEBMLCode2Bytes() {
 		// Value 256 = 0x01 0x00
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{0x01, 0x00});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { 0x01, 0x00 });
 		Assertions.assertEquals(256, Reader.parseEBMLCode(buf));
 	}
 
 	@Test
 	public void testParseEBMLCode4Bytes() {
 		// Known Matroska element ID: EBML header = 0x1A45DFA3
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3 });
 		final long result = Reader.parseEBMLCode(buf);
 		Assertions.assertEquals(0x1A45DFA3L, result);
 	}
@@ -285,19 +283,19 @@ public class VintTest {
 
 	@Test
 	public void testBytesToHexEBMLHeader() {
-		final byte[] data = {(byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3};
+		final byte[] data = { (byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3 };
 		final String hex = Reader.bytesToHex(data);
 		Assertions.assertEquals("1A45DFA3", hex.toUpperCase());
 	}
 
 	@Test
 	public void testBytesToHexSingleByte() {
-		Assertions.assertEquals("FF", Reader.bytesToHex(new byte[]{(byte) 0xFF}).toUpperCase());
-		Assertions.assertEquals("00", Reader.bytesToHex(new byte[]{(byte) 0x00}).toUpperCase());
+		Assertions.assertEquals("FF", Reader.bytesToHex(new byte[] { (byte) 0xFF }).toUpperCase());
+		Assertions.assertEquals("00", Reader.bytesToHex(new byte[] { (byte) 0x00 }).toUpperCase());
 	}
 
 	@Test
 	public void testBytesToHexEmpty() {
-		Assertions.assertEquals("", Reader.bytesToHex(new byte[]{}));
+		Assertions.assertEquals("", Reader.bytesToHex(new byte[] {}));
 	}
 }

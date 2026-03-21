@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 
 import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.io.FileDataSource;
-
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,14 +66,14 @@ public class ReaderTagTest {
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 		// TagName (0x45A3)
 		final byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
-		writeRawElement(inner, new byte[]{(byte) 0x45, (byte) 0xA3}, nameBytes);
+		writeRawElement(inner, new byte[] { (byte) 0x45, (byte) 0xA3 }, nameBytes);
 		// TagString (0x4487)
 		final byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
-		writeRawElement(inner, new byte[]{(byte) 0x44, (byte) 0x87}, valueBytes);
+		writeRawElement(inner, new byte[] { (byte) 0x44, (byte) 0x87 }, valueBytes);
 
 		final ByteArrayOutputStream simpleTag = new ByteArrayOutputStream();
 		// SimpleTag (0x67C8)
-		writeRawElement(simpleTag, new byte[]{(byte) 0x67, (byte) 0xC8}, inner.toByteArray());
+		writeRawElement(simpleTag, new byte[] { (byte) 0x67, (byte) 0xC8 }, inner.toByteArray());
 		return simpleTag.toByteArray();
 	}
 
@@ -88,7 +88,7 @@ public class ReaderTagTest {
 
 		final ByteArrayOutputStream targets = new ByteArrayOutputStream();
 		// Targets (0x63C0)
-		writeRawElement(targets, new byte[]{(byte) 0x63, (byte) 0xC0}, inner.toByteArray());
+		writeRawElement(targets, new byte[] { (byte) 0x63, (byte) 0xC0 }, inner.toByteArray());
 		return targets.toByteArray();
 	}
 
@@ -97,7 +97,7 @@ public class ReaderTagTest {
 	 */
 	private byte[] buildEmptyTargets() {
 		final ByteArrayOutputStream targets = new ByteArrayOutputStream();
-		writeRawElement(targets, new byte[]{(byte) 0x63, (byte) 0xC0}, new byte[0]);
+		writeRawElement(targets, new byte[] { (byte) 0x63, (byte) 0xC0 }, new byte[0]);
 		return targets.toByteArray();
 	}
 
@@ -111,7 +111,7 @@ public class ReaderTagTest {
 
 		final ByteArrayOutputStream tag = new ByteArrayOutputStream();
 		// Tag (0x7373)
-		writeRawElement(tag, new byte[]{(byte) 0x73, (byte) 0x73}, inner.toByteArray());
+		writeRawElement(tag, new byte[] { (byte) 0x73, (byte) 0x73 }, inner.toByteArray());
 		return tag.toByteArray();
 	}
 
@@ -125,7 +125,7 @@ public class ReaderTagTest {
 		}
 		final ByteArrayOutputStream tags = new ByteArrayOutputStream();
 		// Tags (0x1254C367)
-		writeRawElement(tags, new byte[]{(byte) 0x12, (byte) 0x54, (byte) 0xC3, (byte) 0x67}, inner.toByteArray());
+		writeRawElement(tags, new byte[] { (byte) 0x12, (byte) 0x54, (byte) 0xC3, (byte) 0x67 }, inner.toByteArray());
 		return tags.toByteArray();
 	}
 
@@ -134,9 +134,9 @@ public class ReaderTagTest {
 	 */
 	private byte[] encodeUnsignedInt(final long value) {
 		if (value == 0) {
-			return new byte[]{0};
+			return new byte[] { 0 };
 		}
-		final int numBytes = (int) Element.getMinByteSizeUnsigned(value);
+		final int numBytes = Element.getMinByteSizeUnsigned(value);
 		final byte[] result = new byte[numBytes];
 		for (int i = numBytes - 1; i >= 0; i--) {
 			result[i] = (byte) (value >>> ((numBytes - 1 - i) * 8));
@@ -148,7 +148,8 @@ public class ReaderTagTest {
 	 * Write a base .mkv file using Writer.
 	 */
 	private void writeBaseMkv() throws IOException {
-		final org.atriasoft.jimbe.io.FileDataWriter writer = new org.atriasoft.jimbe.io.FileDataWriter(this.destination.getPath());
+		final org.atriasoft.jimbe.io.FileDataWriter writer = new org.atriasoft.jimbe.io.FileDataWriter(
+				this.destination.getPath());
 		final Writer mkvWriter = new Writer(writer);
 		final Track track = new Track();
 		track.setTrackNo(1);
@@ -174,8 +175,8 @@ public class ReaderTagTest {
 	private int findClusterPosition(final byte[] fileBytes) {
 		int lastPos = -1;
 		for (int i = 0; i < fileBytes.length - 3; i++) {
-			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43
-					&& fileBytes[i + 2] == (byte) 0xB6 && fileBytes[i + 3] == (byte) 0x75) {
+			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43 && fileBytes[i + 2] == (byte) 0xB6
+					&& fileBytes[i + 3] == (byte) 0x75) {
 				lastPos = i;
 			}
 		}
@@ -196,7 +197,7 @@ public class ReaderTagTest {
 		Assertions.assertTrue(clusterPos > 0, "Could not find Cluster element in file");
 
 		try (final RandomAccessFile raf = new RandomAccessFile(this.destination, "rw");
-			 final FileChannel ch = raf.getChannel()) {
+				final FileChannel ch = raf.getChannel()) {
 			ch.position(0);
 			ch.write(ByteBuffer.wrap(fileBytes, 0, clusterPos));
 			ch.write(ByteBuffer.wrap(injectedBytes));
@@ -214,21 +215,17 @@ public class ReaderTagTest {
 	}
 
 	// TagTrackUID type ID: 0x63C5
-	private static final byte[] TAG_TRACK_UID_ID = {(byte) 0x63, (byte) 0xC5};
+	private static final byte[] TAG_TRACK_UID_ID = { (byte) 0x63, (byte) 0xC5 };
 	// TagChapterUID type ID: 0x63C4
-	private static final byte[] TAG_CHAPTER_UID_ID = {(byte) 0x63, (byte) 0xC4};
+	private static final byte[] TAG_CHAPTER_UID_ID = { (byte) 0x63, (byte) 0xC4 };
 	// TagAttachmentUID type ID: 0x63C6
-	private static final byte[] TAG_ATTACHMENT_UID_ID = {(byte) 0x63, (byte) 0xC6};
+	private static final byte[] TAG_ATTACHMENT_UID_ID = { (byte) 0x63, (byte) 0xC6 };
 
 	@Test
 	public void testParseTagWithSimpleTag() throws IOException {
 		writeBaseMkv();
 		final byte[] tags = buildTags(
-				buildTag(
-						buildTargets(TAG_TRACK_UID_ID, 1),
-						buildSimpleTag("TITLE", "Test Song")
-				)
-		);
+				buildTag(buildTargets(TAG_TRACK_UID_ID, 1), buildSimpleTag("TITLE", "Test Song")));
 		injectBeforeCluster(tags);
 
 		final Reader reader = openReader();
@@ -242,11 +239,7 @@ public class ReaderTagTest {
 	public void testParseTagWithTrackUID() throws IOException {
 		writeBaseMkv();
 		final byte[] tags = buildTags(
-				buildTag(
-						buildTargets(TAG_TRACK_UID_ID, 42),
-						buildSimpleTag("ARTIST", "Test Artist")
-				)
-		);
+				buildTag(buildTargets(TAG_TRACK_UID_ID, 42), buildSimpleTag("ARTIST", "Test Artist")));
 		injectBeforeCluster(tags);
 
 		final Reader reader = openReader();
@@ -259,16 +252,8 @@ public class ReaderTagTest {
 	@Test
 	public void testParseMultipleTags() throws IOException {
 		writeBaseMkv();
-		final byte[] tags = buildTags(
-				buildTag(
-						buildEmptyTargets(),
-						buildSimpleTag("TITLE", "My Video")
-				),
-				buildTag(
-						buildEmptyTargets(),
-						buildSimpleTag("ARTIST", "Someone")
-				)
-		);
+		final byte[] tags = buildTags(buildTag(buildEmptyTargets(), buildSimpleTag("TITLE", "My Video")),
+				buildTag(buildEmptyTargets(), buildSimpleTag("ARTIST", "Someone")));
 		injectBeforeCluster(tags);
 
 		final Reader reader = openReader();
@@ -282,11 +267,7 @@ public class ReaderTagTest {
 	public void testParseTagWithChapterUID() throws IOException {
 		writeBaseMkv();
 		final byte[] tags = buildTags(
-				buildTag(
-						buildTargets(TAG_CHAPTER_UID_ID, 99),
-						buildSimpleTag("DESCRIPTION", "Chapter description")
-				)
-		);
+				buildTag(buildTargets(TAG_CHAPTER_UID_ID, 99), buildSimpleTag("DESCRIPTION", "Chapter description")));
 		injectBeforeCluster(tags);
 
 		final Reader reader = openReader();
@@ -300,11 +281,7 @@ public class ReaderTagTest {
 	public void testParseTagWithAttachmentUID() throws IOException {
 		writeBaseMkv();
 		final byte[] tags = buildTags(
-				buildTag(
-						buildTargets(TAG_ATTACHMENT_UID_ID, 77),
-						buildSimpleTag("COMMENT", "Attachment comment")
-				)
-		);
+				buildTag(buildTargets(TAG_ATTACHMENT_UID_ID, 77), buildSimpleTag("COMMENT", "Attachment comment")));
 		injectBeforeCluster(tags);
 
 		final Reader reader = openReader();

@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 
 import org.atriasoft.jimbe.ebml.model.BinaryElement;
@@ -12,7 +10,7 @@ import org.atriasoft.jimbe.ebml.model.ProtoType;
 import org.atriasoft.jimbe.ebml.model.SignedIntegerElement;
 import org.atriasoft.jimbe.ebml.model.StringElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
-
+import org.atriasoft.jimbe.matroska.model.DocTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -317,7 +315,8 @@ public class DocTypesExtendedTest {
 
 	@Test
 	public void testStaticLookupReturnsNullForUnknownType() {
-		final ByteBuffer unknownType = ByteBuffer.wrap(new byte[]{(byte) 0x1F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+		final ByteBuffer unknownType = ByteBuffer
+				.wrap(new byte[] { (byte) 0x1F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF });
 		final Element result = ProtoType.getInstance(unknownType);
 		Assertions.assertNull(result);
 	}
@@ -325,7 +324,8 @@ public class DocTypesExtendedTest {
 	@Test
 	public void testStaticLookupSegmentById() {
 		// Segment ID = 0x18538067
-		final ByteBuffer segmentType = ByteBuffer.wrap(new byte[]{(byte) 0x18, (byte) 0x53, (byte) 0x80, (byte) 0x67});
+		final ByteBuffer segmentType = ByteBuffer
+				.wrap(new byte[] { (byte) 0x18, (byte) 0x53, (byte) 0x80, (byte) 0x67 });
 		final Element result = ProtoType.getInstance(segmentType);
 		Assertions.assertNotNull(result);
 		Assertions.assertEquals("Segment", result.getElementType().getName());
@@ -334,7 +334,8 @@ public class DocTypesExtendedTest {
 	@Test
 	public void testStaticLookupClusterById() {
 		// Cluster ID = 0x1F43B675
-		final ByteBuffer clusterType = ByteBuffer.wrap(new byte[]{(byte) 0x1F, (byte) 0x43, (byte) 0xB6, (byte) 0x75});
+		final ByteBuffer clusterType = ByteBuffer
+				.wrap(new byte[] { (byte) 0x1F, (byte) 0x43, (byte) 0xB6, (byte) 0x75 });
 		final Element result = ProtoType.getInstance(clusterType);
 		Assertions.assertNotNull(result);
 		Assertions.assertEquals("Cluster", result.getElementType().getName());

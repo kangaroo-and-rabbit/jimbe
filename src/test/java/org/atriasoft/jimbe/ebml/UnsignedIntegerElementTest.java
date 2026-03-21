@@ -1,9 +1,10 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.Element;
+import org.atriasoft.jimbe.ebml.model.ProtoType;
+import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;

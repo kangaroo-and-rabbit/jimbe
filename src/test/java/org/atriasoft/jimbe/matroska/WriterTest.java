@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,6 +11,10 @@ import org.atriasoft.jimbe.ebml.model.MasterElement;
 import org.atriasoft.jimbe.io.DataSource;
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackOperation;
+import org.atriasoft.jimbe.matroska.model.TrackType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

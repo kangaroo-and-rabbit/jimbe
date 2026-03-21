@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -9,7 +7,10 @@ import java.nio.ByteBuffer;
 import org.atriasoft.jimbe.io.DataSource;
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
-
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
+import org.atriasoft.jimbe.matroska.model.VideoTrack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,7 @@ public class ReaderSeekTest {
 			final Frame frame = new Frame();
 			frame.setTrackNo(1);
 			frame.setTimecode(i * 50L);
-			frame.setData(ByteBuffer.wrap(new byte[]{(byte) i}));
+			frame.setData(ByteBuffer.wrap(new byte[] { (byte) i }));
 			writer.addFrame(frame);
 		}
 		writer.close();
@@ -248,8 +249,8 @@ public class ReaderSeekTest {
 		// Find the Cluster position and truncate before it
 		int clusterPos = -1;
 		for (int i = 0; i < fullFile.length - 3; i++) {
-			if (fullFile[i] == (byte) 0x1F && fullFile[i + 1] == (byte) 0x43
-					&& fullFile[i + 2] == (byte) 0xB6 && fullFile[i + 3] == (byte) 0x75) {
+			if (fullFile[i] == (byte) 0x1F && fullFile[i + 1] == (byte) 0x43 && fullFile[i + 2] == (byte) 0xB6
+					&& fullFile[i + 3] == (byte) 0x75) {
 				clusterPos = i;
 			}
 		}

@@ -1,16 +1,16 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
+import org.atriasoft.jimbe.ebml.model.FloatElement;
+import org.atriasoft.jimbe.ebml.model.ProtoType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class FloatElementTest {
 
 	// Use 4-byte IDs in unused range to avoid collision with DocTypes
-	private static final byte[] FLOAT_ID_1 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x01};
-	private static final byte[] FLOAT_ID_2 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x02};
-	private static final byte[] FLOAT_ID_3 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x03};
+	private static final byte[] FLOAT_ID_1 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x01 };
+	private static final byte[] FLOAT_ID_2 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x02 };
+	private static final byte[] FLOAT_ID_3 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF0, (byte) 0x03 };
 
 	@Test
 	public void testFloatRangeValue() {
@@ -50,8 +50,7 @@ public class FloatElementTest {
 
 	@Test
 	public void testWriteAndReadFloat() {
-		final ProtoType<FloatElement> typeInfo = new ProtoType<>(FloatElement.class, "testFloat_FET",
-				FLOAT_ID_2, 1);
+		final ProtoType<FloatElement> typeInfo = new ProtoType<>(FloatElement.class, "testFloat_FET", FLOAT_ID_2, 1);
 		final FloatElement elem = typeInfo.getInstance();
 		elem.setValue(44100.0);
 

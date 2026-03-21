@@ -1,11 +1,10 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.BinaryElement;
+import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.matroska.model.DocTypes;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,34 +30,34 @@ public class ReaderTest {
 
 	@Test
 	public void testReadEBMLCodeFromDataSource() {
-		final byte[] data = {(byte) 0x81};
+		final byte[] data = { (byte) 0x81 };
 		final MockSource src = new MockSource(ByteBuffer.wrap(data));
 		Assertions.assertEquals(1, Reader.readEBMLCode(src));
 	}
 
 	@Test
 	public void testReadEBMLCode2Bytes() {
-		final byte[] data = {(byte) 0x40, (byte) 0x80};
+		final byte[] data = { (byte) 0x40, (byte) 0x80 };
 		final MockSource src = new MockSource(ByteBuffer.wrap(data));
 		Assertions.assertEquals(128, Reader.readEBMLCode(src));
 	}
 
 	@Test
 	public void testReadEBMLCodeFromByteBuffer() {
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x83});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x83 });
 		Assertions.assertEquals(3, Reader.readEBMLCode(buf));
 	}
 
 	@Test
 	public void testBytesToHex() {
-		final byte[] data = {(byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3};
+		final byte[] data = { (byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3 };
 		final String hex = Reader.bytesToHex(data);
 		Assertions.assertEquals("1A45DFA3", hex.toUpperCase());
 	}
 
 	@Test
 	public void testBytesToHexEmpty() {
-		Assertions.assertEquals("", Reader.bytesToHex(new byte[]{}));
+		Assertions.assertEquals("", Reader.bytesToHex(new byte[] {}));
 	}
 
 	@Test
@@ -119,13 +118,13 @@ public class ReaderTest {
 	@Test
 	public void testParseEBMLCodeValues() {
 		// 1-byte: value 42 encoded as just the raw byte
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{42});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { 42 });
 		Assertions.assertEquals(42, Reader.parseEBMLCode(buf));
 	}
 
 	@Test
 	public void testParseEBMLCode2Bytes() {
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{0x01, 0x00});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { 0x01, 0x00 });
 		Assertions.assertEquals(256, Reader.parseEBMLCode(buf));
 	}
 
@@ -135,7 +134,7 @@ public class ReaderTest {
 		// Actually readSignedEBMLCode reads a VINT then subtracts offset.
 		// For 1-byte VINT, range is 0..126, offset = 63
 		// So to get +5, we need raw=68 -> 0x80|68 = 0xC4
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0xC4});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0xC4 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(5, Reader.readSignedEBMLCode(src));
 	}
@@ -143,7 +142,7 @@ public class ReaderTest {
 	@Test
 	public void testReadSignedEBMLCodeNegative() {
 		// For 1-byte, offset=63. Raw=0 -> signed = 0 - 63 = -63
-		final ByteBuffer buf = ByteBuffer.wrap(new byte[]{(byte) 0x80});
+		final ByteBuffer buf = ByteBuffer.wrap(new byte[] { (byte) 0x80 });
 		final MockSource src = new MockSource(buf);
 		Assertions.assertEquals(-63, Reader.readSignedEBMLCode(src));
 	}

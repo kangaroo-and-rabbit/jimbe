@@ -1,16 +1,15 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.util.Date;
 
+import org.atriasoft.jimbe.ebml.model.DateElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class DateElementTest {
 
 	// Use 4-byte IDs in unused range to avoid collision with DocTypes
-	private static final byte[] DATE_ID = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF3, (byte) 0x01};
+	private static final byte[] DATE_ID = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF3, (byte) 0x01 };
 
 	@Test
 	public void testUnixEpochDelayConstant() {

@@ -1,7 +1,6 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
+import org.atriasoft.jimbe.ebml.model.BinaryElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +27,7 @@ public class BinaryElementTest {
 
 	@Test
 	public void testConstructorWithType() {
-		final byte[] typeId = {(byte) 0x1F, (byte) 0xFE, (byte) 0xFA, (byte) 0x01};
+		final byte[] typeId = { (byte) 0x1F, (byte) 0xFE, (byte) 0xFA, (byte) 0x01 };
 		final BinaryElement elem = new BinaryElement(typeId);
 		Assertions.assertTrue(elem.isType(typeId));
 	}

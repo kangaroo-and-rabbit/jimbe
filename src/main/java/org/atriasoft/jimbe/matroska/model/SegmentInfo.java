@@ -11,93 +11,82 @@ import org.atriasoft.jimbe.io.DataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SegmentInfo
-{
-  private static final Logger LOG = LoggerFactory.getLogger(SegmentInfo.class);
-  private static final long BLOCK_SIZE = 128;
+public class SegmentInfo {
+	private static final Logger LOG = LoggerFactory.getLogger(SegmentInfo.class);
+	private static final long BLOCK_SIZE = 128;
 
-  private long timecodeScale = 1000000;
-  private Double duration;
-  private Date segmentDate = new Date();
-  private final long myPosition;
+	private long timecodeScale = 1000000;
+	private Double duration;
+	private Date segmentDate = new Date();
+	private final long myPosition;
 
-  public SegmentInfo(final long position)
-  {
-    myPosition = position;
-  }
+	public SegmentInfo(final long position) {
+		this.myPosition = position;
+	}
 
-  public long writeElement(final DataWriter ioDW)
-  {
-    final MasterElement segmentInfoElem = DocTypes.Info.getInstance();
+	public long writeElement(final DataWriter ioDW) {
+		final MasterElement segmentInfoElem = DocTypes.Info.getInstance();
 
-    final StringElement writingAppElem = DocTypes.WritingApp.getInstance();
-    writingAppElem.setValue("Matroska File Writer v1.0");
+		final StringElement writingAppElem = DocTypes.WritingApp.getInstance();
+		writingAppElem.setValue("Matroska File Writer v1.0");
 
-    final StringElement muxingAppElem = DocTypes.MuxingApp.getInstance();
-    muxingAppElem.setValue("JEBML v1.0");
+		final StringElement muxingAppElem = DocTypes.MuxingApp.getInstance();
+		muxingAppElem.setValue("JEBML v1.0");
 
-    final DateElement dateElem = DocTypes.DateUTC.getInstance();
-    dateElem.setDate(segmentDate);
+		final DateElement dateElem = DocTypes.DateUTC.getInstance();
+		dateElem.setDate(this.segmentDate);
 
-    // Add timecode scale
-    final UnsignedIntegerElement timecodescaleElem = DocTypes.TimecodeScale.getInstance();
-    timecodescaleElem.setValue(timecodeScale);
+		// Add timecode scale
+		final UnsignedIntegerElement timecodescaleElem = DocTypes.TimecodeScale.getInstance();
+		timecodescaleElem.setValue(this.timecodeScale);
 
-    segmentInfoElem.addChildElement(dateElem);
-    segmentInfoElem.addChildElement(timecodescaleElem);
+		segmentInfoElem.addChildElement(dateElem);
+		segmentInfoElem.addChildElement(timecodescaleElem);
 
-    if (duration != null)
-    {
-      final FloatElement durationElem = DocTypes.Duration.getInstance();
-      durationElem.setValue(duration);
-      segmentInfoElem.addChildElement(durationElem);
-    }
+		if (this.duration != null) {
+			final FloatElement durationElem = DocTypes.Duration.getInstance();
+			durationElem.setValue(this.duration);
+			segmentInfoElem.addChildElement(durationElem);
+		}
 
-    segmentInfoElem.addChildElement(writingAppElem);
-    segmentInfoElem.addChildElement(muxingAppElem);
+		segmentInfoElem.addChildElement(writingAppElem);
+		segmentInfoElem.addChildElement(muxingAppElem);
 
-    final long len = segmentInfoElem.writeElement(ioDW);
-    final VoidElement spacer = new VoidElement(BLOCK_SIZE - len);
-    spacer.writeElement(ioDW);
-    return 1;
-  }
+		final long len = segmentInfoElem.writeElement(ioDW);
+		final VoidElement spacer = new VoidElement(BLOCK_SIZE - len);
+		spacer.writeElement(ioDW);
+		return 1;
+	}
 
-  public void update(final DataWriter ioDW)
-  {
-    LOG.debug("Updating segment info header");
-    final long startingPos = ioDW.getFilePointer();
-    ioDW.seek(myPosition);
-    writeElement(ioDW);
-    ioDW.seek(startingPos);
-  }
+	public void update(final DataWriter ioDW) {
+		LOG.debug("Updating segment info header");
+		final long startingPos = ioDW.getFilePointer();
+		ioDW.seek(this.myPosition);
+		writeElement(ioDW);
+		ioDW.seek(startingPos);
+	}
 
-  public double getDuration()
-  {
-    return duration;
-  }
+	public double getDuration() {
+		return this.duration;
+	}
 
-  public void setDuration(final double duration)
-  {
-    this.duration = duration;
-  }
+	public void setDuration(final double duration) {
+		this.duration = duration;
+	}
 
-  public Date getDate()
-  {
-    return segmentDate;
-  }
+	public Date getDate() {
+		return this.segmentDate;
+	}
 
-  public void setDate(final Date date)
-  {
-    this.segmentDate = date;
-  }
+	public void setDate(final Date date) {
+		this.segmentDate = date;
+	}
 
-  public long getTimecodeScale()
-  {
-    return timecodeScale;
-  }
+	public long getTimecodeScale() {
+		return this.timecodeScale;
+	}
 
-  public void setTimecodeScale(final long timecodeScale)
-  {
-    this.timecodeScale = timecodeScale;
-  }
+	public void setTimecodeScale(final long timecodeScale) {
+		this.timecodeScale = timecodeScale;
+	}
 }

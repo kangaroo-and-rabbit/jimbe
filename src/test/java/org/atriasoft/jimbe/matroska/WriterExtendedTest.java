@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -9,7 +7,11 @@ import java.nio.charset.StandardCharsets;
 
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
-
+import org.atriasoft.jimbe.matroska.model.AudioTrack;
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
+import org.atriasoft.jimbe.matroska.model.VideoTrack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +55,7 @@ public class WriterExtendedTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x00, 0x00, 0x00, 0x01, 0x67}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x00, 0x00, 0x00, 0x01, 0x67 }));
 		writer.addFrame(frame);
 
 		writer.close();
@@ -90,7 +92,7 @@ public class WriterExtendedTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
 		writer.addFrame(frame);
 
 		writer.close();

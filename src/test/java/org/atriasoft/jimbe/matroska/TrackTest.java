@@ -1,8 +1,10 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
-
+import org.atriasoft.jimbe.matroska.model.AudioTrack;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackOperation;
+import org.atriasoft.jimbe.matroska.model.TrackType;
+import org.atriasoft.jimbe.matroska.model.VideoTrack;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

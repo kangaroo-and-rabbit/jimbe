@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 
 import org.atriasoft.jimbe.ebml.model.Element;
@@ -9,7 +7,7 @@ import org.atriasoft.jimbe.ebml.model.MasterElement;
 import org.atriasoft.jimbe.ebml.model.ProtoType;
 import org.atriasoft.jimbe.ebml.model.StringElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
-
+import org.atriasoft.jimbe.matroska.model.DocTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -98,7 +96,7 @@ public class DocTypesTest {
 
 	@Test
 	public void testStaticLookupByType() {
-		final ByteBuffer ebmlType = ByteBuffer.wrap(new byte[]{(byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3});
+		final ByteBuffer ebmlType = ByteBuffer.wrap(new byte[] { (byte) 0x1A, (byte) 0x45, (byte) 0xDF, (byte) 0xA3 });
 		final Element result = ProtoType.getInstance(ebmlType);
 		Assertions.assertNotNull(result);
 		Assertions.assertEquals("EBML", result.getElementType().getName());

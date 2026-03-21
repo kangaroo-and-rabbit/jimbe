@@ -1,9 +1,8 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.matroska.model.Frame;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +46,7 @@ public class FrameTest {
 	@Test
 	public void testSetDataStoresDuplicate() {
 		final Frame frame = new Frame();
-		final ByteBuffer original = ByteBuffer.wrap(new byte[]{1, 2, 3, 4, 5});
+		final ByteBuffer original = ByteBuffer.wrap(new byte[] { 1, 2, 3, 4, 5 });
 		frame.setData(original);
 		original.get();
 		final ByteBuffer retrieved = frame.getData();
@@ -58,7 +57,7 @@ public class FrameTest {
 	@Test
 	public void testGetDataReturnsDuplicate() {
 		final Frame frame = new Frame();
-		frame.setData(ByteBuffer.wrap(new byte[]{10, 20, 30}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 10, 20, 30 }));
 		final ByteBuffer data1 = frame.getData();
 		data1.get();
 		final ByteBuffer data2 = frame.getData();
@@ -90,7 +89,7 @@ public class FrameTest {
 		original.setTimecode(1000);
 		original.setDuration(33);
 		original.setKeyFrame(true);
-		original.setData(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+		original.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 		original.addReferences(42L, 84L);
 
 		final Frame copy = new Frame(original);
@@ -106,7 +105,7 @@ public class FrameTest {
 	@Test
 	public void testCopyConstructorIndependentReferences() {
 		final Frame original = new Frame();
-		original.setData(ByteBuffer.wrap(new byte[]{1}));
+		original.setData(ByteBuffer.wrap(new byte[] { 1 }));
 		original.addReferences(10L);
 
 		final Frame copy = new Frame(original);

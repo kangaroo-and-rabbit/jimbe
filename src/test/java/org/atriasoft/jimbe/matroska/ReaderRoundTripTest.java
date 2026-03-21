@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -9,7 +7,11 @@ import java.nio.charset.StandardCharsets;
 
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
-
+import org.atriasoft.jimbe.matroska.model.AudioTrack;
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
+import org.atriasoft.jimbe.matroska.model.VideoTrack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,7 +126,7 @@ public class ReaderRoundTripTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x00, 0x00, 0x00, 0x01, 0x67}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x00, 0x00, 0x00, 0x01, 0x67 }));
 		writer.addFrame(frame);
 		writer.close();
 
@@ -140,7 +142,7 @@ public class ReaderRoundTripTest {
 	public void testCodecPrivateRoundTrip() throws IOException {
 		final Writer writer = new Writer(this.ioDW);
 
-		final byte[] codecPrivateData = {0x01, 0x42, (byte) 0xE0, 0x1E, (byte) 0xFF, (byte) 0xE1};
+		final byte[] codecPrivateData = { 0x01, 0x42, (byte) 0xE0, 0x1E, (byte) 0xFF, (byte) 0xE1 };
 		final Track track = new Track();
 		track.setTrackNo(1);
 		track.setTrackType(TrackType.VIDEO);
@@ -156,7 +158,7 @@ public class ReaderRoundTripTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01 }));
 		writer.addFrame(frame);
 		writer.close();
 
@@ -291,7 +293,7 @@ public class ReaderRoundTripTest {
 		track.setDefaultDuration(1000);
 		writer.addTrack(track);
 
-		final String[] texts = {"Hello World", "Bonjour le monde", "こんにちは世界"};
+		final String[] texts = { "Hello World", "Bonjour le monde", "こんにちは世界" };
 		for (int i = 0; i < texts.length; i++) {
 			final Frame frame = new Frame();
 			frame.setTrackNo(1);
@@ -326,7 +328,7 @@ public class ReaderRoundTripTest {
 		track.setDefaultDuration(1000);
 		writer.addTrack(track);
 
-		final long[] timecodes = {0, 1000, 2000, 5000, 10000};
+		final long[] timecodes = { 0, 1000, 2000, 5000, 10000 };
 		for (final long tc : timecodes) {
 			final Frame frame = new Frame();
 			frame.setTrackNo(1);
@@ -341,8 +343,7 @@ public class ReaderRoundTripTest {
 		Frame frame = reader.getNextFrame();
 		int count = 0;
 		while (frame != null) {
-			Assertions.assertTrue(frame.getTimecode() >= lastTimecode,
-					"Timecodes should be non-decreasing");
+			Assertions.assertTrue(frame.getTimecode() >= lastTimecode, "Timecodes should be non-decreasing");
 			lastTimecode = frame.getTimecode();
 			count++;
 			frame = reader.getNextFrame();
@@ -384,7 +385,7 @@ public class ReaderRoundTripTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01 }));
 		writer.addFrame(frame);
 		writer.close();
 
@@ -467,14 +468,14 @@ public class ReaderRoundTripTest {
 		keyFrame.setTrackNo(1);
 		keyFrame.setTimecode(0);
 		keyFrame.setKeyFrame(true);
-		keyFrame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02}));
+		keyFrame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02 }));
 		writer.addFrame(keyFrame);
 
 		final Frame nonKeyFrame = new Frame();
 		nonKeyFrame.setTrackNo(1);
 		nonKeyFrame.setTimecode(33);
 		nonKeyFrame.setKeyFrame(false);
-		nonKeyFrame.setData(ByteBuffer.wrap(new byte[]{0x03, 0x04}));
+		nonKeyFrame.setData(ByteBuffer.wrap(new byte[] { 0x03, 0x04 }));
 		writer.addFrame(nonKeyFrame);
 
 		writer.close();
@@ -537,13 +538,13 @@ public class ReaderRoundTripTest {
 		// Build an Info element containing only a Title child
 		final byte[] titleStr = "My Test Title".getBytes(StandardCharsets.UTF_8);
 		final java.io.ByteArrayOutputStream titleElem = new java.io.ByteArrayOutputStream();
-		titleElem.write(new byte[]{(byte) 0x7B, (byte) 0xA9}); // Title type ID
+		titleElem.write(new byte[] { (byte) 0x7B, (byte) 0xA9 }); // Title type ID
 		titleElem.write(org.atriasoft.jimbe.ebml.model.Element.makeEbmlCodedSize(titleStr.length));
 		titleElem.write(titleStr);
 
 		final java.io.ByteArrayOutputStream infoElem = new java.io.ByteArrayOutputStream();
 		final byte[] infoData = titleElem.toByteArray();
-		infoElem.write(new byte[]{(byte) 0x15, (byte) 0x49, (byte) 0xA9, (byte) 0x66}); // Info type ID
+		infoElem.write(new byte[] { (byte) 0x15, (byte) 0x49, (byte) 0xA9, (byte) 0x66 }); // Info type ID
 		infoElem.write(org.atriasoft.jimbe.ebml.model.Element.makeEbmlCodedSize(infoData.length));
 		infoElem.write(infoData);
 
@@ -564,15 +565,15 @@ public class ReaderRoundTripTest {
 		// Find the last occurrence of Cluster ID (0x1F43B675) to skip SeekHead entries
 		int clusterPos = -1;
 		for (int i = 0; i < fileBytes.length - 3; i++) {
-			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43
-					&& fileBytes[i + 2] == (byte) 0xB6 && fileBytes[i + 3] == (byte) 0x75) {
+			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43 && fileBytes[i + 2] == (byte) 0xB6
+					&& fileBytes[i + 3] == (byte) 0x75) {
 				clusterPos = i;
 			}
 		}
 		Assertions.assertTrue(clusterPos > 0, "Could not find Cluster element in file");
 
 		try (final java.io.RandomAccessFile raf = new java.io.RandomAccessFile(this.destination, "rw");
-			 final java.nio.channels.FileChannel ch = raf.getChannel()) {
+				final java.nio.channels.FileChannel ch = raf.getChannel()) {
 			ch.position(0);
 			ch.write(ByteBuffer.wrap(fileBytes, 0, clusterPos));
 			ch.write(ByteBuffer.wrap(injectedBytes));

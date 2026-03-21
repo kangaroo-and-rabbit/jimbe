@@ -1,11 +1,9 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 
 import org.atriasoft.jimbe.ebml.MockWriter;
-
+import org.atriasoft.jimbe.matroska.model.Segment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

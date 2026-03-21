@@ -1,7 +1,5 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +10,11 @@ import java.nio.channels.FileChannel;
 import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
-
+import org.atriasoft.jimbe.matroska.model.AudioTrack;
+import org.atriasoft.jimbe.matroska.model.Frame;
+import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
+import org.atriasoft.jimbe.matroska.model.VideoTrack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,7 +94,7 @@ public class BlockGroupTest {
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
 		frame.setDuration(33);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
 		writer.addFrame(frame);
 
 		writer.close();
@@ -110,7 +112,7 @@ public class BlockGroupTest {
 		final Writer writer = new Writer(this.ioDW);
 		addVideoTrack(writer);
 
-		final byte[] payload = {0x0A, 0x0B, 0x0C, 0x0D, 0x0E};
+		final byte[] payload = { 0x0A, 0x0B, 0x0C, 0x0D, 0x0E };
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
@@ -140,7 +142,7 @@ public class BlockGroupTest {
 		frame.setTrackNo(1);
 		frame.setTimecode(500);
 		frame.setDuration(50);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01 }));
 		writer.addFrame(frame);
 
 		writer.close();
@@ -161,7 +163,7 @@ public class BlockGroupTest {
 			frame.setTrackNo(1);
 			frame.setTimecode(i * 33);
 			frame.setDuration(33);
-			frame.setData(ByteBuffer.wrap(new byte[]{(byte) i}));
+			frame.setData(ByteBuffer.wrap(new byte[] { (byte) i }));
 			writer.addFrame(frame);
 		}
 
@@ -185,7 +187,7 @@ public class BlockGroupTest {
 		final Frame simpleFrame = new Frame();
 		simpleFrame.setTrackNo(1);
 		simpleFrame.setTimecode(0);
-		simpleFrame.setData(ByteBuffer.wrap(new byte[]{0x01}));
+		simpleFrame.setData(ByteBuffer.wrap(new byte[] { 0x01 }));
 		writer.addFrame(simpleFrame);
 
 		// Frame with duration -> BlockGroup
@@ -193,7 +195,7 @@ public class BlockGroupTest {
 		blockGroupFrame.setTrackNo(1);
 		blockGroupFrame.setTimecode(33);
 		blockGroupFrame.setDuration(33);
-		blockGroupFrame.setData(ByteBuffer.wrap(new byte[]{0x02}));
+		blockGroupFrame.setData(ByteBuffer.wrap(new byte[] { 0x02 }));
 		writer.addFrame(blockGroupFrame);
 
 		writer.close();
@@ -239,9 +241,9 @@ public class BlockGroupTest {
 	 */
 	private byte[] encodeUnsignedInt(final long value) {
 		if (value == 0) {
-			return new byte[]{0};
+			return new byte[] { 0 };
 		}
-		final int numBytes = (int) Element.getMinByteSizeUnsigned(value);
+		final int numBytes = Element.getMinByteSizeUnsigned(value);
 		final byte[] result = new byte[numBytes];
 		for (int i = numBytes - 1; i >= 0; i--) {
 			result[i] = (byte) (value >>> ((numBytes - 1 - i) * 8));
@@ -253,8 +255,11 @@ public class BlockGroupTest {
 	 * Build a Block element inner data for a single frame.
 	 * Format: EBML-coded track number + 2-byte timecode + 1-byte flags + payload
 	 */
-	private byte[] buildBlockInnerData(final int trackNo, final short timecode,
-			final byte flags, final byte[] payload) {
+	private byte[] buildBlockInnerData(
+			final int trackNo,
+			final short timecode,
+			final byte flags,
+			final byte[] payload) {
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		// EBML-coded track number
 		out.writeBytes(Element.makeEbmlCodedSize(trackNo));
@@ -271,23 +276,27 @@ public class BlockGroupTest {
 	/**
 	 * Build a BlockGroup element with Block + BlockDuration + ReferenceBlock.
 	 */
-	private byte[] buildBlockGroupWithReference(final int trackNo, final short timecode,
-			final byte[] payload, final long duration, final long reference) {
+	private byte[] buildBlockGroupWithReference(
+			final int trackNo,
+			final short timecode,
+			final byte[] payload,
+			final long duration,
+			final long reference) {
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 
 		// Block (0xA1)
 		final byte[] blockData = buildBlockInnerData(trackNo, timecode, (byte) 0x00, payload);
-		writeRawElement(inner, new byte[]{(byte) 0xA1}, blockData);
+		writeRawElement(inner, new byte[] { (byte) 0xA1 }, blockData);
 
 		// BlockDuration (0x9B)
-		writeRawElement(inner, new byte[]{(byte) 0x9B}, encodeUnsignedInt(duration));
+		writeRawElement(inner, new byte[] { (byte) 0x9B }, encodeUnsignedInt(duration));
 
 		// ReferenceBlock (0xFB) - signed integer
-		writeRawElement(inner, new byte[]{(byte) 0xFB}, encodeSignedInt(reference));
+		writeRawElement(inner, new byte[] { (byte) 0xFB }, encodeSignedInt(reference));
 
 		// Wrap in BlockGroup (0xA0)
 		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
-		writeRawElement(bg, new byte[]{(byte) 0xA0}, inner.toByteArray());
+		writeRawElement(bg, new byte[] { (byte) 0xA0 }, inner.toByteArray());
 		return bg.toByteArray();
 	}
 
@@ -297,14 +306,13 @@ public class BlockGroupTest {
 	private byte[] buildCluster(final long clusterTimecode, final byte[]... children) {
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 		// Timecode (0xE7)
-		writeRawElement(inner, new byte[]{(byte) 0xE7}, encodeUnsignedInt(clusterTimecode));
+		writeRawElement(inner, new byte[] { (byte) 0xE7 }, encodeUnsignedInt(clusterTimecode));
 		for (final byte[] child : children) {
 			inner.writeBytes(child);
 		}
 		final ByteArrayOutputStream cluster = new ByteArrayOutputStream();
 		// Cluster (0x1F43B675)
-		writeRawElement(cluster,
-				new byte[]{(byte) 0x1F, (byte) 0x43, (byte) 0xB6, (byte) 0x75},
+		writeRawElement(cluster, new byte[] { (byte) 0x1F, (byte) 0x43, (byte) 0xB6, (byte) 0x75 },
 				inner.toByteArray());
 		return cluster.toByteArray();
 	}
@@ -315,8 +323,8 @@ public class BlockGroupTest {
 	private int findClusterPosition(final byte[] fileBytes) {
 		int lastPos = -1;
 		for (int i = 0; i < fileBytes.length - 3; i++) {
-			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43
-					&& fileBytes[i + 2] == (byte) 0xB6 && fileBytes[i + 3] == (byte) 0x75) {
+			if (fileBytes[i] == (byte) 0x1F && fileBytes[i + 1] == (byte) 0x43 && fileBytes[i + 2] == (byte) 0xB6
+					&& fileBytes[i + 3] == (byte) 0x75) {
 				lastPos = i;
 			}
 		}
@@ -337,7 +345,7 @@ public class BlockGroupTest {
 		Assertions.assertTrue(clusterPos > 0, "Could not find Cluster element in file");
 
 		try (final RandomAccessFile raf = new RandomAccessFile(this.destination, "rw");
-			 final FileChannel ch = raf.getChannel()) {
+				final FileChannel ch = raf.getChannel()) {
 			ch.position(0);
 			ch.write(ByteBuffer.wrap(fileBytes, 0, clusterPos));
 			ch.write(ByteBuffer.wrap(injectedBytes));
@@ -372,9 +380,8 @@ public class BlockGroupTest {
 		writeBaseMkv();
 
 		// Build a cluster containing a BlockGroup with ReferenceBlock
-		final byte[] payload = {0x10, 0x20, 0x30};
-		final byte[] cluster = buildCluster(0,
-				buildBlockGroupWithReference(1, (short) 0, payload, 50, -33));
+		final byte[] payload = { 0x10, 0x20, 0x30 };
+		final byte[] cluster = buildCluster(0, buildBlockGroupWithReference(1, (short) 0, payload, 50, -33));
 
 		replaceCluster(cluster);
 
@@ -388,8 +395,7 @@ public class BlockGroupTest {
 		Assertions.assertEquals(1, readFrame.getTrackNo());
 		Assertions.assertEquals(50, readFrame.getDuration());
 		// ReferenceBlock is parsed and stored via addReferences
-		Assertions.assertFalse(readFrame.getReferences().isEmpty(),
-				"Frame should have at least one reference");
+		Assertions.assertFalse(readFrame.getReferences().isEmpty(), "Frame should have at least one reference");
 		Assertions.assertEquals(-33L, readFrame.getReferences().get(0).longValue());
 	}
 
@@ -410,8 +416,7 @@ public class BlockGroupTest {
 	 *   0x02 = Xiph, 0x04 = Fixed, 0x06 = EBML
 	 * So for fixed lacing: flags byte = 0x04 (lace bits) | 0x80 (keyframe) = 0x84
 	 */
-	private byte[] buildFixedLacedSimpleBlock(final int trackNo, final short timecode,
-			final byte[][] frames) {
+	private byte[] buildFixedLacedSimpleBlock(final int trackNo, final short timecode, final byte[][] frames) {
 		final int frameSize = frames[0].length;
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		// EBML-coded track number
@@ -436,7 +441,7 @@ public class BlockGroupTest {
 	private byte[] buildSimpleBlockElement(final byte[] innerData) {
 		final ByteArrayOutputStream sb = new ByteArrayOutputStream();
 		// SimpleBlock (0xA3)
-		writeRawElement(sb, new byte[]{(byte) 0xA3}, innerData);
+		writeRawElement(sb, new byte[] { (byte) 0xA3 }, innerData);
 		return sb.toByteArray();
 	}
 
@@ -450,13 +455,8 @@ public class BlockGroupTest {
 		writeBaseMkv();
 
 		// Build a fixed-laced SimpleBlock with 3 frames of 2 bytes each
-		final byte[][] frameData = {
-			{0x10, 0x20},
-			{0x30, 0x40},
-			{0x50, 0x60}
-		};
-		final byte[] simpleBlock = buildSimpleBlockElement(
-				buildFixedLacedSimpleBlock(1, (short) 0, frameData));
+		final byte[][] frameData = { { 0x10, 0x20 }, { 0x30, 0x40 }, { 0x50, 0x60 } };
+		final byte[] simpleBlock = buildSimpleBlockElement(buildFixedLacedSimpleBlock(1, (short) 0, frameData));
 		final byte[] cluster = buildCluster(0, simpleBlock);
 
 		replaceCluster(cluster);
@@ -470,22 +470,19 @@ public class BlockGroupTest {
 		Assertions.assertNotNull(firstFrame, "First laced frame should not be null");
 		Assertions.assertEquals(0, firstFrame.getTimecode());
 		Assertions.assertEquals(1, firstFrame.getTrackNo());
-		Assertions.assertEquals(2, firstFrame.getData().remaining(),
-				"First frame data should be 2 bytes");
+		Assertions.assertEquals(2, firstFrame.getData().remaining(), "First frame data should be 2 bytes");
 
 		// Second frame (covers the getFrameCount() > 1 loop)
 		final Frame secondFrame = reader.getNextFrame();
 		Assertions.assertNotNull(secondFrame, "Second laced frame should not be null");
 		Assertions.assertEquals(0, secondFrame.getTimecode());
 		Assertions.assertEquals(1, secondFrame.getTrackNo());
-		Assertions.assertEquals(2, secondFrame.getData().remaining(),
-				"Second frame data should be 2 bytes");
+		Assertions.assertEquals(2, secondFrame.getData().remaining(), "Second frame data should be 2 bytes");
 
 		// Third frame
 		final Frame thirdFrame = reader.getNextFrame();
 		Assertions.assertNotNull(thirdFrame, "Third laced frame should not be null");
-		Assertions.assertEquals(2, thirdFrame.getData().remaining(),
-				"Third frame data should be 2 bytes");
+		Assertions.assertEquals(2, thirdFrame.getData().remaining(), "Third frame data should be 2 bytes");
 	}
 
 	// ========== Multi-frame laced BlockGroup ==========
@@ -496,28 +493,30 @@ public class BlockGroupTest {
 	 * supports it via the block.getFrameCount() > 1 loop in the BlockGroup
 	 * branch (lines ~491-505 in Reader.java).
 	 */
-	private byte[] buildLacedBlockGroup(final int trackNo, final short timecode,
-			final byte[][] frames, final long duration) {
+	private byte[] buildLacedBlockGroup(
+			final int trackNo,
+			final short timecode,
+			final byte[][] frames,
+			final long duration) {
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 
 		// Block (0xA1) with fixed-size lacing
 		final byte[] blockInner = buildFixedLacedBlock(trackNo, timecode, frames);
-		writeRawElement(inner, new byte[]{(byte) 0xA1}, blockInner);
+		writeRawElement(inner, new byte[] { (byte) 0xA1 }, blockInner);
 
 		// BlockDuration (0x9B)
-		writeRawElement(inner, new byte[]{(byte) 0x9B}, encodeUnsignedInt(duration));
+		writeRawElement(inner, new byte[] { (byte) 0x9B }, encodeUnsignedInt(duration));
 
 		// Wrap in BlockGroup (0xA0)
 		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
-		writeRawElement(bg, new byte[]{(byte) 0xA0}, inner.toByteArray());
+		writeRawElement(bg, new byte[] { (byte) 0xA0 }, inner.toByteArray());
 		return bg.toByteArray();
 	}
 
 	/**
 	 * Build Block inner data with fixed-size lacing (no keyframe flag).
 	 */
-	private byte[] buildFixedLacedBlock(final int trackNo, final short timecode,
-			final byte[][] frames) {
+	private byte[] buildFixedLacedBlock(final int trackNo, final short timecode, final byte[][] frames) {
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		out.writeBytes(Element.makeEbmlCodedSize(trackNo));
 		out.write((timecode >> 8) & 0xFF);
@@ -546,11 +545,7 @@ public class BlockGroupTest {
 	public void testLacedBlockGroupMultipleFrames() throws IOException {
 		writeBaseMkv();
 
-		final byte[][] frameData = {
-			{0x11, 0x22, 0x33},
-			{0x44, 0x55, 0x66},
-			{0x77, (byte) 0x88, (byte) 0x99}
-		};
+		final byte[][] frameData = { { 0x11, 0x22, 0x33 }, { 0x44, 0x55, 0x66 }, { 0x77, (byte) 0x88, (byte) 0x99 } };
 		final byte[] blockGroup = buildLacedBlockGroup(1, (short) 0, frameData, 100);
 		final byte[] cluster = buildCluster(0, blockGroup);
 
@@ -591,10 +586,10 @@ public class BlockGroupTest {
 		// Build a BlockGroup containing only a BlockDuration (no Block child)
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 		// BlockDuration (0x9B) with value 100
-		writeRawElement(inner, new byte[]{(byte) 0x9B}, encodeUnsignedInt(100));
+		writeRawElement(inner, new byte[] { (byte) 0x9B }, encodeUnsignedInt(100));
 		// Wrap in BlockGroup (0xA0)
 		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
-		writeRawElement(bg, new byte[]{(byte) 0xA0}, inner.toByteArray());
+		writeRawElement(bg, new byte[] { (byte) 0xA0 }, inner.toByteArray());
 
 		final byte[] cluster = buildCluster(0, bg.toByteArray());
 		replaceCluster(cluster);
@@ -620,7 +615,7 @@ public class BlockGroupTest {
 			final Frame frame = new Frame();
 			frame.setTrackNo(1);
 			frame.setTimecode(i * 1000L);
-			frame.setData(ByteBuffer.wrap(new byte[]{(byte) i}));
+			frame.setData(ByteBuffer.wrap(new byte[] { (byte) i }));
 			writer.addFrame(frame);
 		}
 
@@ -650,13 +645,13 @@ public class BlockGroupTest {
 			final Frame videoFrame = new Frame();
 			videoFrame.setTrackNo(1);
 			videoFrame.setTimecode(i * 33L);
-			videoFrame.setData(ByteBuffer.wrap(new byte[]{(byte) (0xA0 + i)}));
+			videoFrame.setData(ByteBuffer.wrap(new byte[] { (byte) (0xA0 + i) }));
 			writer.addFrame(videoFrame);
 
 			final Frame audioFrame = new Frame();
 			audioFrame.setTrackNo(2);
 			audioFrame.setTimecode(i * 33L);
-			audioFrame.setData(ByteBuffer.wrap(new byte[]{(byte) (0xB0 + i)}));
+			audioFrame.setData(ByteBuffer.wrap(new byte[] { (byte) (0xB0 + i) }));
 			writer.addFrame(audioFrame);
 		}
 
@@ -688,13 +683,13 @@ public class BlockGroupTest {
 			final Frame videoFrame = new Frame();
 			videoFrame.setTrackNo(1);
 			videoFrame.setTimecode(i * 33L);
-			videoFrame.setData(ByteBuffer.wrap(new byte[]{(byte) i}));
+			videoFrame.setData(ByteBuffer.wrap(new byte[] { (byte) i }));
 			writer.addFrame(videoFrame);
 
 			final Frame audioFrame = new Frame();
 			audioFrame.setTrackNo(2);
 			audioFrame.setTimecode(i * 33L);
-			audioFrame.setData(ByteBuffer.wrap(new byte[]{(byte) (0x10 + i)}));
+			audioFrame.setData(ByteBuffer.wrap(new byte[] { (byte) (0x10 + i) }));
 			writer.addFrame(audioFrame);
 		}
 
@@ -729,7 +724,7 @@ public class BlockGroupTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
 		writer.addFrame(frame);
 
 		writer.close();
@@ -747,7 +742,7 @@ public class BlockGroupTest {
 		final Frame frame = new Frame();
 		frame.setTrackNo(1);
 		frame.setTimecode(0);
-		frame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02}));
+		frame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02 }));
 		writer.addFrame(frame);
 
 		writer.close();
@@ -779,14 +774,14 @@ public class BlockGroupTest {
 		final Frame videoFrame = new Frame();
 		videoFrame.setTrackNo(1);
 		videoFrame.setTimecode(0);
-		videoFrame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04}));
+		videoFrame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
 		writer.addFrame(videoFrame);
 
 		// Write an audio frame on track 2 with enough data
 		final Frame audioFrame = new Frame();
 		audioFrame.setTrackNo(2);
 		audioFrame.setTimecode(0);
-		audioFrame.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04, 0x05}));
+		audioFrame.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05 }));
 		writer.addFrame(audioFrame);
 
 		writer.close();

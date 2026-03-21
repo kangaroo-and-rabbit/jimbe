@@ -1,9 +1,8 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.matroska.model.Block;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +21,11 @@ public class BlockTest {
 	 * - Flags byte (keyframe=bit7, lacing=bits1-2)
 	 * - Frame data
 	 */
-	private ByteBuffer buildSimpleBlock(final int trackNo, final short timecode, final boolean keyFrame, final byte[] frameData) {
+	private ByteBuffer buildSimpleBlock(
+			final int trackNo,
+			final short timecode,
+			final boolean keyFrame,
+			final byte[] frameData) {
 		final ByteBuffer buf = ByteBuffer.allocate(1 + 2 + 1 + frameData.length);
 		buf.put((byte) (trackNo | 0x80));
 		buf.putShort(timecode);
@@ -35,7 +38,7 @@ public class BlockTest {
 
 	@Test
 	public void testParseSimpleBlockNoLacing() {
-		final byte[] frameData = {0x01, 0x02, 0x03, 0x04, 0x05};
+		final byte[] frameData = { 0x01, 0x02, 0x03, 0x04, 0x05 };
 		final ByteBuffer blockData = buildSimpleBlock(1, (short) 0, true, frameData);
 
 		final Block block = new Block(blockData);
@@ -52,7 +55,7 @@ public class BlockTest {
 
 	@Test
 	public void testParseBlockNonKeyFrame() {
-		final byte[] frameData = {0x0A, 0x0B};
+		final byte[] frameData = { 0x0A, 0x0B };
 		final ByteBuffer blockData = buildSimpleBlock(1, (short) 100, false, frameData);
 
 		final Block block = new Block(blockData);
@@ -65,7 +68,7 @@ public class BlockTest {
 	@Test
 	public void testParseBlockNegativeTimecode() {
 		// Per Matroska spec, block timecode is a signed int16 relative to cluster timecode
-		final byte[] frameData = {0x01};
+		final byte[] frameData = { 0x01 };
 		final ByteBuffer blockData = buildSimpleBlock(1, (short) -50, true, frameData);
 
 		final Block block = new Block(blockData);
@@ -77,7 +80,7 @@ public class BlockTest {
 	@Test
 	public void testParseBlockMultipleTracks() {
 		// Track number 5
-		final byte[] frameData = {0x01, 0x02};
+		final byte[] frameData = { 0x01, 0x02 };
 		final ByteBuffer blockData = buildSimpleBlock(5, (short) 0, true, frameData);
 
 		final Block block = new Block(blockData);
@@ -92,7 +95,7 @@ public class BlockTest {
 		// Flags: keyframe=1, lacing mode=fixed (0x04)
 		final int trackNo = 1;
 		final int numFrames = 3;
-		final byte[] frameData = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+		final byte[] frameData = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 
 		final ByteBuffer buf = ByteBuffer.allocate(1 + 2 + 1 + 1 + frameData.length);
 		buf.put((byte) (trackNo | 0x80));
@@ -117,11 +120,12 @@ public class BlockTest {
 	public void testParseXiphLacing() {
 		// Xiph lacing: frame sizes encoded as sum of 255-valued bytes + terminator
 		final int trackNo = 1;
-		final byte[] frame0Data = {0x01, 0x02, 0x03}; // 3 bytes
-		final byte[] frame1Data = {0x04, 0x05}; // 2 bytes
-		final byte[] frame2Data = {0x06, 0x07, 0x08, 0x09}; // 4 bytes (last, deduced)
+		final byte[] frame0Data = { 0x01, 0x02, 0x03 }; // 3 bytes
+		final byte[] frame1Data = { 0x04, 0x05 }; // 2 bytes
+		final byte[] frame2Data = { 0x06, 0x07, 0x08, 0x09 }; // 4 bytes (last, deduced)
 
-		final ByteBuffer buf = ByteBuffer.allocate(1 + 2 + 1 + 1 + 2 + frame0Data.length + frame1Data.length + frame2Data.length);
+		final ByteBuffer buf = ByteBuffer
+				.allocate(1 + 2 + 1 + 1 + 2 + frame0Data.length + frame1Data.length + frame2Data.length);
 		buf.put((byte) (trackNo | 0x80));
 		buf.putShort((short) 0);
 		buf.put((byte) (0x80 | 0x02)); // keyframe + xiph lacing
@@ -180,9 +184,9 @@ public class BlockTest {
 	public void testParseEBMLLacing() {
 		// EBML lacing: first frame size as unsigned VINT, subsequent as signed delta
 		final int trackNo = 1;
-		final byte[] frame0Data = {0x01, 0x02, 0x03}; // 3 bytes
-		final byte[] frame1Data = {0x04, 0x05, 0x06}; // 3 bytes (delta = 0 from first)
-		final byte[] frame2Data = {0x07, 0x08}; // 2 bytes (last, deduced)
+		final byte[] frame0Data = { 0x01, 0x02, 0x03 }; // 3 bytes
+		final byte[] frame1Data = { 0x04, 0x05, 0x06 }; // 3 bytes (delta = 0 from first)
+		final byte[] frame2Data = { 0x07, 0x08 }; // 2 bytes (last, deduced)
 
 		final ByteBuffer buf = ByteBuffer.allocate(64);
 		buf.put((byte) (trackNo | 0x80));
@@ -210,7 +214,7 @@ public class BlockTest {
 
 	@Test
 	public void testGetAdjustedBlockTimecode() {
-		final byte[] frameData = {0x01};
+		final byte[] frameData = { 0x01 };
 		final ByteBuffer blockData = buildSimpleBlock(1, (short) 33, true, frameData);
 
 		final Block block = new Block(blockData);
@@ -222,7 +226,7 @@ public class BlockTest {
 
 	@Test
 	public void testGetFrameThrowsForNonLacedBlock() {
-		final byte[] frameData = {0x01, 0x02};
+		final byte[] frameData = { 0x01, 0x02 };
 		final ByteBuffer blockData = buildSimpleBlock(1, (short) 0, true, frameData);
 
 		final Block block = new Block(blockData);
@@ -237,7 +241,7 @@ public class BlockTest {
 	@Test
 	public void testBlockTimecodeMinMax() {
 		// Test with min and max signed int16 values
-		final byte[] frameData = {0x01};
+		final byte[] frameData = { 0x01 };
 
 		final ByteBuffer minBlock = buildSimpleBlock(1, Short.MIN_VALUE, true, frameData);
 		final Block blockMin = new Block(minBlock);

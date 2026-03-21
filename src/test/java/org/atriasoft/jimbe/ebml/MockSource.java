@@ -6,60 +6,51 @@ import org.atriasoft.jimbe.io.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MockSource implements DataSource
-{
+public class MockSource implements DataSource {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MockSource.class);
-  private final ByteBuffer buffer;
+	private static final Logger LOG = LoggerFactory.getLogger(MockSource.class);
+	private final ByteBuffer buffer;
 
-  public MockSource(final ByteBuffer buffer)
-  {
-    this.buffer = buffer;
-  }
+	public MockSource(final ByteBuffer buffer) {
+		this.buffer = buffer;
+	}
 
-  @Override
-  public long length()
-  {
-    return buffer.limit();
-  }
+	@Override
+	public long length() {
+		return this.buffer.limit();
+	}
 
-  @Override
-  public long getFilePointer()
-  {
-    return buffer.position();
-  }
+	@Override
+	public long getFilePointer() {
+		return this.buffer.position();
+	}
 
-  @Override
-  public boolean isSeekable()
-  {
-    return true;
-  }
+	@Override
+	public boolean isSeekable() {
+		return true;
+	}
 
-  @Override
-  public long seek(final long pos)
-  {
-    buffer.position((int) pos);
-    return pos;
-  }
+	@Override
+	public long seek(final long pos) {
+		this.buffer.position((int) pos);
+		return pos;
+	}
 
-  @Override
-  public byte readByte()
-  {
-    return buffer.get();
-  }
+	@Override
+	public byte readByte() {
+		return this.buffer.get();
+	}
 
-  @Override
-  public int read(final ByteBuffer buff)
-  {
-    buffer.get(buff.array(), buff.position(), buff.remaining());
-    buff.position(buff.limit());
-    return buff.remaining();
-  }
+	@Override
+	public int read(final ByteBuffer buff) {
+		this.buffer.get(buff.array(), buff.position(), buff.remaining());
+		buff.position(buff.limit());
+		return buff.remaining();
+	}
 
-  @Override
-  public long skip(final long offset)
-  {
-    buffer.position((int) (buffer.position() + offset));
-    return offset;
-  }
+	@Override
+	public long skip(final long offset) {
+		this.buffer.position((int) (this.buffer.position() + offset));
+		return offset;
+	}
 }

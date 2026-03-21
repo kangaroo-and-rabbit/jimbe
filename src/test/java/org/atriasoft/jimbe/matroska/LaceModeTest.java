@@ -1,7 +1,6 @@
 package org.atriasoft.jimbe.matroska;
 
-import org.atriasoft.jimbe.matroska.model.*;
-
+import org.atriasoft.jimbe.matroska.model.LaceMode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

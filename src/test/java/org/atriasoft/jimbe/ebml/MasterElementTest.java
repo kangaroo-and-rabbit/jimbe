@@ -1,21 +1,24 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.BinaryElement;
+import org.atriasoft.jimbe.ebml.model.Element;
+import org.atriasoft.jimbe.ebml.model.MasterElement;
+import org.atriasoft.jimbe.ebml.model.ProtoType;
+import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class MasterElementTest {
 
 	// Use 4-byte IDs in unused range to avoid collision with DocTypes
-	private static final byte[] MASTER_ID_1 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x01};
-	private static final byte[] CHILD_ID_1 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x02};
-	private static final byte[] CHILD_ID_2 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x03};
-	private static final byte[] MASTER_ID_2 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x04};
-	private static final byte[] INNER_ID = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x05};
-	private static final byte[] LEAF_ID = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x06};
+	private static final byte[] MASTER_ID_1 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x01 };
+	private static final byte[] CHILD_ID_1 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x02 };
+	private static final byte[] CHILD_ID_2 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x03 };
+	private static final byte[] MASTER_ID_2 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x04 };
+	private static final byte[] INNER_ID = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x05 };
+	private static final byte[] LEAF_ID = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF2, (byte) 0x06 };
 
 	@Test
 	public void testAddChildElementIncreasesSize() {
@@ -24,7 +27,7 @@ public class MasterElementTest {
 		Assertions.assertEquals(0, master.getSize());
 
 		final BinaryElement child = new BinaryElement(CHILD_ID_1);
-		child.setData(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+		child.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 
 		master.addChildElement(child);
 		Assertions.assertEquals(child.getTotalSize(), master.getSize());
@@ -36,10 +39,10 @@ public class MasterElementTest {
 		master.setType(MASTER_ID_1);
 
 		final BinaryElement child1 = new BinaryElement(CHILD_ID_1);
-		child1.setData(ByteBuffer.wrap(new byte[]{1, 2}));
+		child1.setData(ByteBuffer.wrap(new byte[] { 1, 2 }));
 
 		final BinaryElement child2 = new BinaryElement(CHILD_ID_2);
-		child2.setData(ByteBuffer.wrap(new byte[]{3, 4, 5}));
+		child2.setData(ByteBuffer.wrap(new byte[] { 3, 4, 5 }));
 
 		master.addChildElement(child1);
 		master.addChildElement(child2);
@@ -49,10 +52,10 @@ public class MasterElementTest {
 
 	@Test
 	public void testWriteAndReadChildren() {
-		final ProtoType<MasterElement> masterType = new ProtoType<>(MasterElement.class, "TestMaster_MET",
-				MASTER_ID_2, 1);
-		final ProtoType<UnsignedIntegerElement> childType = new ProtoType<>(UnsignedIntegerElement.class, "TestChild_MET",
-				CHILD_ID_1, 2);
+		final ProtoType<MasterElement> masterType = new ProtoType<>(MasterElement.class, "TestMaster_MET", MASTER_ID_2,
+				1);
+		final ProtoType<UnsignedIntegerElement> childType = new ProtoType<>(UnsignedIntegerElement.class,
+				"TestChild_MET", CHILD_ID_1, 2);
 
 		final MasterElement master = masterType.getInstance();
 		final UnsignedIntegerElement child = childType.getInstance();
@@ -85,10 +88,8 @@ public class MasterElementTest {
 
 	@Test
 	public void testNestedMasterElements() {
-		final ProtoType<MasterElement> outerType = new ProtoType<>(MasterElement.class, "Outer_MET",
-				MASTER_ID_1, 0);
-		final ProtoType<MasterElement> innerType = new ProtoType<>(MasterElement.class, "Inner_MET",
-				INNER_ID, 1);
+		final ProtoType<MasterElement> outerType = new ProtoType<>(MasterElement.class, "Outer_MET", MASTER_ID_1, 0);
+		final ProtoType<MasterElement> innerType = new ProtoType<>(MasterElement.class, "Inner_MET", INNER_ID, 1);
 		final ProtoType<UnsignedIntegerElement> leafType = new ProtoType<>(UnsignedIntegerElement.class, "Leaf_MET",
 				LEAF_ID, 2);
 

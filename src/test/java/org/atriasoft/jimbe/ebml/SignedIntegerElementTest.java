@@ -1,23 +1,24 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.Element;
+import org.atriasoft.jimbe.ebml.model.ProtoType;
+import org.atriasoft.jimbe.ebml.model.SignedIntegerElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SignedIntegerElementTest {
-	
+
 	private static final Logger LOG = LoggerFactory.getLogger(UnsignedIntegerElementTest.class);
-	
+
 	private final MockWriter writer = new MockWriter();
 	private final ProtoType<SignedIntegerElement> typeInfo = new ProtoType<>(SignedIntegerElement.class, "test",
 			new byte[] { (byte) 0xC2 }, 1);
 	private final SignedIntegerElement elem = this.typeInfo.getInstance();
-	
+
 	@Test
 	public void testPositiveData() {
 		for (int i = 0; i < 8; ++i) {
@@ -36,7 +37,7 @@ public class SignedIntegerElementTest {
 			buf.clear();
 		}
 	}
-	
+
 	@Test
 	public void testNegativeData() {
 		for (int i = 0; i < 7; ++i) {
@@ -55,7 +56,7 @@ public class SignedIntegerElementTest {
 			buf.clear();
 		}
 	}
-	
+
 	@Test
 	public void testPositiveElement() {
 		for (int i = 0; i < 8; ++i) {
@@ -63,7 +64,7 @@ public class SignedIntegerElementTest {
 			final long size = Element.getMinByteSize(value);
 			final long sizeSize = Element.getMinByteSizeUnsigned(size);
 			LOG.debug("Testing element {} val {} ({})", i, value, size);
-			
+
 			this.elem.setValue(value);
 			Assertions.assertEquals(value, this.elem.getValue());
 			this.elem.writeElement(this.writer);
@@ -79,7 +80,7 @@ public class SignedIntegerElementTest {
 			buf.clear();
 		}
 	}
-	
+
 	@Test
 	public void testNegativeElement() {
 		for (int i = 0; i < 8; ++i) {
@@ -87,7 +88,7 @@ public class SignedIntegerElementTest {
 			final long size = Element.getMinByteSize(value);
 			final long sizeSize = Element.getMinByteSizeUnsigned(size);
 			LOG.debug("Testing element {} val {} ({})", i, value, size);
-			
+
 			this.elem.setValue(value);
 			Assertions.assertEquals(value, this.elem.getValue());
 			this.elem.writeElement(this.writer);

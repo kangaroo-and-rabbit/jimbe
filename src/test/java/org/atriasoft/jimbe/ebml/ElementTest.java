@@ -1,9 +1,10 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.ByteBuffer;
 
+import org.atriasoft.jimbe.ebml.model.BinaryElement;
+import org.atriasoft.jimbe.ebml.model.Element;
+import org.atriasoft.jimbe.ebml.model.ProtoType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ public class ElementTest {
 
 	@Test
 	public void testMakeEbmlCodedSizeRoundTrip() {
-		final long[] values = {0, 1, 42, 126, 127, 16382, 16383, 2097150, 2097151};
+		final long[] values = { 0, 1, 42, 126, 127, 16382, 16383, 2097150, 2097151 };
 		for (final long v : values) {
 			final byte[] encoded = Element.makeEbmlCodedSize(v);
 			final ByteBuffer buf = ByteBuffer.wrap(encoded);
@@ -72,7 +73,7 @@ public class ElementTest {
 
 	@Test
 	public void testPackIntUnsignedRoundTrip() {
-		final long[] values = {1, 42, 255, 256, 65535, 0xFFFFFFL, 0xFFFFFFFFL};
+		final long[] values = { 1, 42, 255, 256, 65535, 0xFFFFFFL, 0xFFFFFFFFL };
 		for (final long v : values) {
 			final byte[] packed = Element.packIntUnsigned(v);
 			long reconstructed = 0;
@@ -96,8 +97,8 @@ public class ElementTest {
 	@Test
 	public void testSetDataUpdatesSize() {
 		final Element elem = new BinaryElement();
-		elem.setType(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		final ByteBuffer data = ByteBuffer.wrap(new byte[]{1, 2, 3, 4, 5});
+		elem.setType(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		final ByteBuffer data = ByteBuffer.wrap(new byte[] { 1, 2, 3, 4, 5 });
 		elem.setData(data);
 		Assertions.assertEquals(5, elem.getSize());
 	}
@@ -105,8 +106,8 @@ public class ElementTest {
 	@Test
 	public void testGetDataReturnsDuplicate() {
 		final Element elem = new BinaryElement();
-		elem.setType(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		final ByteBuffer data = ByteBuffer.wrap(new byte[]{1, 2, 3});
+		elem.setType(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		final ByteBuffer data = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
 		elem.setData(data);
 		final ByteBuffer dup = elem.getData();
 		dup.get();
@@ -116,32 +117,33 @@ public class ElementTest {
 	@Test
 	public void testClearData() {
 		final Element elem = new BinaryElement();
-		elem.setType(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		elem.setData(ByteBuffer.wrap(new byte[]{1}));
+		elem.setType(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		elem.setData(ByteBuffer.wrap(new byte[] { 1 }));
 		elem.clearData();
 		Assertions.assertThrows(NullPointerException.class, () -> elem.getData());
 	}
 
 	@Test
 	public void testIsTypeByteArray() {
-		final byte[] typeId = {(byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA1};
+		final byte[] typeId = { (byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA1 };
 		final Element elem = new BinaryElement(typeId);
 		Assertions.assertTrue(elem.isType(typeId));
-		Assertions.assertFalse(elem.isType(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA2}));
+		Assertions.assertFalse(elem.isType(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA2 }));
 	}
 
 	@Test
 	public void testIsTypeByteBuffer() {
-		final byte[] typeId = {(byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA1};
+		final byte[] typeId = { (byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA1 };
 		final Element elem = new BinaryElement(typeId);
 		Assertions.assertTrue(elem.isType(ByteBuffer.wrap(typeId)));
-		Assertions.assertFalse(elem.isType(ByteBuffer.wrap(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA2})));
+		Assertions.assertFalse(
+				elem.isType(ByteBuffer.wrap(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xA2 })));
 	}
 
 	@Test
 	public void testGetTotalSizeWithHeaders() {
-		final Element elem = new BinaryElement(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		elem.setData(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+		final Element elem = new BinaryElement(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		elem.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 		final long totalSize = elem.getTotalSize();
 		Assertions.assertTrue(totalSize > 3);
 		// 4 bytes type + 1 byte size + 3 bytes data
@@ -150,16 +152,16 @@ public class ElementTest {
 
 	@Test
 	public void testGetTotalSizeWithHeadersSizeOverride() {
-		final Element elem = new BinaryElement(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		elem.setData(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+		final Element elem = new BinaryElement(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		elem.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 		elem.setHeadersSize(10);
 		Assertions.assertEquals(10 + 3, elem.getTotalSize());
 	}
 
 	@Test
 	public void testSetSizeClearsHeadersSize() {
-		final Element elem = new BinaryElement(new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42});
-		elem.setData(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+		final Element elem = new BinaryElement(new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFE, (byte) 0x42 });
+		elem.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 		elem.setHeadersSize(10);
 		elem.setSize(5);
 		final long totalSize = elem.getTotalSize();
@@ -170,9 +172,9 @@ public class ElementTest {
 	@Test
 	public void testWriteAndReadBack() {
 		final ProtoType<BinaryElement> typeInfo = new ProtoType<>(BinaryElement.class, "testBin_ET",
-				new byte[]{(byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xFC}, 1);
+				new byte[] { (byte) 0x1F, (byte) 0xFE, (byte) 0xFD, (byte) 0xFC }, 1);
 		final BinaryElement elem = typeInfo.getInstance();
-		elem.setData(ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03}));
+		elem.setData(ByteBuffer.wrap(new byte[] { 0x01, 0x02, 0x03 }));
 
 		final MockWriter writer = new MockWriter();
 		elem.writeElement(writer);
@@ -193,8 +195,8 @@ public class ElementTest {
 
 	@Test
 	public void testParentAccessors() {
-		final Element parent = new BinaryElement(new byte[]{(byte) 0x01});
-		final Element child = new BinaryElement(new byte[]{(byte) 0x02});
+		final Element parent = new BinaryElement(new byte[] { (byte) 0x01 });
+		final Element child = new BinaryElement(new byte[] { (byte) 0x02 });
 		child.setParent(parent);
 		Assertions.assertSame(parent, child.getParent());
 	}

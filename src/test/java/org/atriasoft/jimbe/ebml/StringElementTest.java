@@ -1,18 +1,19 @@
 package org.atriasoft.jimbe.ebml;
 
-import org.atriasoft.jimbe.ebml.model.*;
-
 import java.nio.charset.StandardCharsets;
 
+import org.atriasoft.jimbe.ebml.model.ProtoType;
+import org.atriasoft.jimbe.ebml.model.StringElement;
+import org.atriasoft.jimbe.ebml.model.UTF8StringElement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class StringElementTest {
 
 	// Use 4-byte IDs in unused range to avoid collision with DocTypes
-	private static final byte[] STR_ID_1 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x01};
-	private static final byte[] STR_ID_2 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x02};
-	private static final byte[] STR_ID_3 = {(byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x03};
+	private static final byte[] STR_ID_1 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x01 };
+	private static final byte[] STR_ID_2 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x02 };
+	private static final byte[] STR_ID_3 = { (byte) 0x1F, (byte) 0xFE, (byte) 0xF1, (byte) 0x03 };
 
 	@Test
 	public void testDefaultEncodingIsAscii() {
@@ -71,8 +72,7 @@ public class StringElementTest {
 
 	@Test
 	public void testWriteAndReadBackAscii() {
-		final ProtoType<StringElement> typeInfo = new ProtoType<>(StringElement.class, "testStr_SET",
-				STR_ID_3, 1);
+		final ProtoType<StringElement> typeInfo = new ProtoType<>(StringElement.class, "testStr_SET", STR_ID_3, 1);
 		final StringElement elem = typeInfo.getInstance();
 		elem.setValue("abc");
 
