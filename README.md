@@ -2,7 +2,7 @@
 
 Java library for reading and writing EBML (Extensible Binary Meta Language) and Matroska/WebM container files.
 
-Jimbe is a modernized fork of [JEBML](https://github.com/Matroska-Org/jebml), restructured with clean package separation and simplified class naming.
+Jimbe is a modernized fork of [JEBML](https://github.com/Matroska-Org/jebml), restructured with clean package separation, simplified class naming, comprehensive unit tests for stabilization, and Javadoc documentation.
 
 ## Features
 
