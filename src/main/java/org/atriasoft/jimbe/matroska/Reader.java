@@ -187,43 +187,35 @@ public class Reader {
 	 * @return The next Frame in the queue, or null if there are no more frames for the TrackNo track
 	 */
 	public Frame getNextFrame(final int trackNo) {
-		if (this.frameQueue.isEmpty()) {
-			fillFrameQueue();
-		}
-
-		// If FrameQueue is still empty, must be the end of the file
-		if (this.frameQueue.isEmpty()) {
-			return null;
-		}
 		int tryCount = 0;
-		Frame frame = null;
 		try {
-			final Iterator<Frame> iter = this.frameQueue.iterator();
-			while (frame == null) {
-				if (iter.hasNext()) {
-					frame = iter.next();
+			while (true) {
+				if (this.frameQueue.isEmpty()) {
+					fillFrameQueue();
+				}
+				if (this.frameQueue.isEmpty()) {
+					return null;
+				}
+				final Iterator<Frame> iter = this.frameQueue.iterator();
+				while (iter.hasNext()) {
+					final Frame frame = iter.next();
 					if (frame.getTrackNo() == trackNo) {
 						synchronized (this.frameQueue) {
 							iter.remove();
 						}
 						return frame;
 					}
-					frame = null;
-				} else {
-					fillFrameQueue();
-					if (++tryCount > CLUSTER_TRACK_SEARCH_COUNT) {
-						// If we have not found any frames belonging to a track in 4 clusters
-						// there is a good chance that the track is over
-						return null;
-					}
+				}
+				// No matching frame found in current queue, load more
+				fillFrameQueue();
+				if (++tryCount > CLUSTER_TRACK_SEARCH_COUNT) {
+					return null;
 				}
 			}
 		} catch (final RuntimeException ex) {
 			ex.printStackTrace();
 			return null;
 		}
-
-		return frame;
 	}
 
 	/**
@@ -309,6 +301,8 @@ public class Reader {
 			while (level1 != null) {
 				if (level1.isType(DocTypes.Cluster.getType())) {
 					parseNextCluster(level1);
+					level1.skipData(this.ioDS);
+					break;
 				}
 
 				level1.skipData(this.ioDS);
@@ -355,7 +349,8 @@ public class Reader {
 
 			} else if (level2.isType(DocTypes.BlockGroup.getType())) {
 				long blockDuration = 0;
-				long blockReference = 0;
+				boolean hasReference = false;
+				final ArrayList<Long> references = new ArrayList<>();
 				level3 = ((MasterElement) level2).readNextChild(this.reader);
 				Block block = null;
 				while (level3 != null) {
@@ -370,7 +365,8 @@ public class Reader {
 
 					} else if (level3.isType(DocTypes.ReferenceBlock.getType())) {
 						level3.readData(this.ioDS);
-						blockReference = ((SignedIntegerElement) level3).getValue();
+						hasReference = true;
+						references.add(((SignedIntegerElement) level3).getValue());
 					}
 
 					level3.skipData(this.ioDS);
@@ -385,7 +381,11 @@ public class Reader {
 				frame.setTrackNo(block.getTrackNo());
 				frame.setTimecode(block.getAdjustedBlockTimecode(clusterTimecode, this.timecodeScale));
 				frame.setDuration(blockDuration);
-				frame.addReferences(blockReference);
+				// In Matroska, a BlockGroup without ReferenceBlock is a keyframe
+				frame.setKeyFrame(!hasReference);
+				for (final Long ref : references) {
+					frame.addReferences(ref);
+				}
 				frame.setData(block.getFrame(0));
 				this.frameQueue.add(new Frame(frame));
 

@@ -63,6 +63,17 @@ public class Cluster {
 	}
 
 	/**
+	 * Checks if the cluster should be flushed before adding this frame.
+	 * Forces cluster boundaries on keyframes so that Cues always point to seekable positions.
+	 *
+	 * @param frame the frame about to be added
+	 * @return {@code true} if the cluster should be flushed before adding this frame
+	 */
+	public boolean shouldFlushBefore(final Frame frame) {
+		return frame.isKeyFrame() && !this.frames.isEmpty();
+	}
+
+	/**
 	 * Adds a frame to the cluster.
 	 *
 	 * @param frame the frame to add

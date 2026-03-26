@@ -2,12 +2,12 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.List;
 
 import org.atriasoft.jimbe.ebml.model.BinaryElement;
 import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.ebml.model.MasterElement;
+import org.atriasoft.jimbe.ebml.model.SignedIntegerElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +83,11 @@ public class SimpleBlock {
 		durationElem.setValue(this.duration);
 		blockGroupElem.addChildElement(blockElem);
 		blockGroupElem.addChildElement(durationElem);
+		if (!this.keyFrame) {
+			final SignedIntegerElement refElem = DocTypes.ReferenceBlock.getInstance();
+			refElem.setValue(0);
+			blockGroupElem.addChildElement(refElem);
+		}
 		return blockGroupElem;
 	}
 
@@ -98,25 +103,35 @@ public class SimpleBlock {
 		}
 
 		buf.putShort(this.timecode);
-		final BitSet bs = new BitSet(8);
-		bs.set(0, this.keyFrame);
-		bs.set(4, this.invisible);
+		// Matroska SimpleBlock flags byte (big-endian bit numbering):
+		// bit 7 (0x80): keyframe
+		// bit 3 (0x08): invisible
+		// bits 2-1 (0x06): lacing (00=none, 01=Xiph, 11=EBML, 10=fixed)
+		// bit 0 (0x01): discardable
+		byte flags = 0;
+		if (this.keyFrame) {
+			flags |= 0x80;
+		}
+		if (this.invisible) {
+			flags |= 0x08;
+		}
+		if (this.discardable) {
+			flags |= 0x01;
+		}
 		ByteBuffer sizes = null;
 		this.laceMode = pickBestLaceMode();
-		// TODO: correctly calculate resultant buffer size for different lace modes
 		switch (this.laceMode) {
 			case EBML:
-				bs.set(5);
-				bs.set(6);
+				flags |= 0x06;
 				sizes = ebmlEncodeLaceSizes();
 				break;
 			case XIPH:
-				bs.set(6);
+				flags |= 0x02;
 				sizes = xiphEncodeLaceSizes();
 				break;
 			case FIXED:
+				flags |= 0x04;
 				sizes = fixedEncodeLaceSizes();
-				bs.set(5);
 				break;
 			case NONE:
 				LOG.trace("Lace mode none!");
@@ -124,8 +139,7 @@ public class SimpleBlock {
 			default:
 				break;
 		}
-		bs.set(7, this.discardable);
-		buf.put(bs.toByteArray());
+		buf.put(flags);
 		if (sizes != null) {
 			buf.put(sizes);
 		}
@@ -146,7 +160,10 @@ public class SimpleBlock {
 
 	private ByteBuffer fixedEncodeLaceSizes() {
 		LOG.trace("Encoding fixed lace sizes");
-		return ByteBuffer.allocate(1).put((byte) (this.frames.size() - 1));
+		final ByteBuffer buf = ByteBuffer.allocate(1);
+		buf.put((byte) (this.frames.size() - 1));
+		buf.flip();
+		return buf;
 	}
 
 	private ByteBuffer xiphEncodeLaceSizes() {
@@ -161,6 +178,7 @@ public class SimpleBlock {
 			}
 			buf.put((byte) tmpSize);
 		}
+		buf.flip();
 		return buf;
 	}
 
@@ -172,6 +190,7 @@ public class SimpleBlock {
 			final int tmpSize = this.frames.get(i).getData().remaining();
 			buf.put(Element.makeEbmlCodedSize(tmpSize));
 		}
+		buf.flip();
 		return buf;
 	}
 
@@ -232,6 +251,7 @@ public class SimpleBlock {
 		LOG.trace("Adding frame {}", frame.getData().remaining());
 		setTimecode(frame.getTimecode());
 		setTrackNumber(frame.getTrackNo());
+		setKeyFrame(frame.isKeyFrame());
 		this.totalSize += frame.getData().remaining();
 		this.frames.add(frame);
 		if (frame.getDuration() != Long.MIN_VALUE) {

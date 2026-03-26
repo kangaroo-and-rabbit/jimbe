@@ -52,19 +52,18 @@ public class Cues {
 		final UnsignedIntegerElement cueTime = DocTypes.CueTime.getInstance();
 		cueTime.setValue(timecodeOfCluster);
 		final MasterElement cuePoint = DocTypes.CuePoint.getInstance();
-		final MasterElement cueTrackPositions = createCueTrackPositions(positionInFile, clusterTrackNumbers);
 
-		this.cues.addChildElement(cuePoint);
 		cuePoint.addChildElement(cueTime);
-		cuePoint.addChildElement(cueTrackPositions);
+		addCueTrackPositions(cuePoint, positionInFile, clusterTrackNumbers);
+		this.cues.addChildElement(cuePoint);
 
 		LOG.debug("Finished adding matroska cue to cues element");
 	}
 
-	private MasterElement createCueTrackPositions(final long positionInFile, final Collection<Integer> trackNumbers) {
-		final MasterElement cueTrackPositions = DocTypes.CueTrackPositions.getInstance();
-
+	private void addCueTrackPositions(final MasterElement cuePoint, final long positionInFile, final Collection<Integer> trackNumbers) {
 		for (final Integer trackNumber : trackNumbers) {
+			final MasterElement cueTrackPositions = DocTypes.CueTrackPositions.getInstance();
+
 			final UnsignedIntegerElement cueTrack = DocTypes.CueTrack.getInstance();
 			cueTrack.setValue(trackNumber);
 
@@ -73,8 +72,9 @@ public class Cues {
 
 			cueTrackPositions.addChildElement(cueTrack);
 			cueTrackPositions.addChildElement(cueClusterPosition);
+
+			cuePoint.addChildElement(cueTrackPositions);
 		}
-		return cueTrackPositions;
 	}
 
 	/**
