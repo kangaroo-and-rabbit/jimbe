@@ -243,41 +243,42 @@ public class SimpleBlockTest {
 		final ByteBuffer data = elem.getData();
 		// Flags byte at position 3: 1 (track) + 2 (timecode) = index 3
 		final int flags = data.get(3) & 0xFF;
-		// In BitSet layout: bits 5-6 are the lace mode bits.
-		// NONE -> neither bit 5 nor bit 6 set -> (flags & 0x60) == 0
-		final int laceBits = flags & 0x60;
+		// Lace mode bits are bits 1-2 of flags byte.
+		// NONE -> both bits clear -> (flags & 0x06) == 0
+		final int laceBits = flags & 0x06;
 		Assertions.assertEquals(0x00, laceBits, "Single frame should have no lacing");
 	}
 
-	/**
-	 * EBML lacing with multiple frames causes BufferOverflowException.
-	 * Bug: ebmlEncodeLaceSizes() doesn't flip its buffer, so buf.put(sizes)
-	 * tries to write up to 30 uninitialized bytes, overflowing the output buffer.
-	 */
 	@Test
-	public void testEbmlLaceOverflows() {
+	public void testEbmlLaceEncoding() {
 		final SimpleBlock block = new SimpleBlock();
 		block.setLaceMode(LaceMode.EBML);
 		block.addFrame(makeFrame(1, 0, new byte[] { 0x01, 0x02 }));
 		block.addFrame(makeFrame(1, 0, new byte[] { 0x03, 0x04 }));
 
-		Assertions.assertThrows(java.nio.BufferOverflowException.class, () -> block.toSimpleBlock(),
-				"EBML lacing has a known bug: missing flip() on sizes buffer");
+		final Element elem = block.toSimpleBlock();
+		final ByteBuffer data = elem.getData();
+		final int flags = data.get(3) & 0xFF;
+		Assertions.assertEquals(0x06, flags & 0x06, "EBML lacing should set bits 1-2");
+		// byte 4 = lace count (1 = 2 frames - 1)
+		Assertions.assertEquals(1, data.get(4) & 0xFF, "Lace count should be 1 for 2 frames");
 	}
 
-	/**
-	 * XIPH lacing with multiple frames causes BufferOverflowException.
-	 * Bug: xiphEncodeLaceSizes() doesn't flip its buffer, same as EBML.
-	 */
 	@Test
-	public void testXiphLaceOverflows() {
+	public void testXiphLaceEncoding() {
 		final SimpleBlock block = new SimpleBlock();
 		block.setLaceMode(LaceMode.XIPH);
 		block.addFrame(makeFrame(1, 0, new byte[] { 0x01, 0x02 }));
 		block.addFrame(makeFrame(1, 0, new byte[] { 0x03, 0x04 }));
 
-		Assertions.assertThrows(java.nio.BufferOverflowException.class, () -> block.toSimpleBlock(),
-				"XIPH lacing has a known bug: missing flip() on sizes buffer");
+		final Element elem = block.toSimpleBlock();
+		final ByteBuffer data = elem.getData();
+		final int flags = data.get(3) & 0xFF;
+		Assertions.assertEquals(0x02, flags & 0x06, "XIPH lacing should set bit 1 only");
+		// byte 4 = lace count (1 = 2 frames - 1)
+		Assertions.assertEquals(1, data.get(4) & 0xFF, "Lace count should be 1 for 2 frames");
+		// byte 5 = first frame size (2 bytes)
+		Assertions.assertEquals(2, data.get(5) & 0xFF, "First frame size should be 2");
 	}
 
 	@Test
@@ -290,19 +291,11 @@ public class SimpleBlockTest {
 		final Element elem = block.toSimpleBlock();
 		final ByteBuffer data = elem.getData();
 		final int flags = data.get(3) & 0xFF;
-		// FIXED lacing: bs.set(5) only -> bit 5 -> 0x20
-		Assertions.assertEquals(0x20, flags & 0x60, "FIXED lacing should set only bit 5");
+		Assertions.assertEquals(0x04, flags & 0x06, "FIXED lacing should set bit 2 only");
 	}
 
-	/**
-	 * Fixed lacing lace count byte is silently lost.
-	 * Bug: fixedEncodeLaceSizes() returns a ByteBuffer with position=1 (after
-	 * the put), so remaining()=0. The lace count is written into the buffer
-	 * but never transferred to the output because buf.put(sizes) copies 0 bytes.
-	 * As a result, the frame data directly follows the flags byte with no lace count.
-	 */
 	@Test
-	public void testFixedLaceCountByteLost() {
+	public void testFixedLaceCountBytePresent() {
 		final SimpleBlock block = new SimpleBlock();
 		block.setLaceMode(LaceMode.FIXED);
 		block.addFrame(makeFrame(1, 0, new byte[] { 0x01, 0x02 }));
@@ -310,10 +303,10 @@ public class SimpleBlockTest {
 
 		final Element elem = block.toSimpleBlock();
 		final ByteBuffer data = elem.getData();
-		// Due to the bug, byte 4 is the first frame's first byte, not the lace count.
-		// The lace count byte (1) was written to sizes buffer but never transferred.
-		Assertions.assertEquals(0x01, data.get(4) & 0xFF,
-				"Bug: lace count byte is lost, frame data starts immediately after flags");
+		// byte 4 = lace count (1 = 2 frames - 1)
+		Assertions.assertEquals(1, data.get(4) & 0xFF, "Lace count byte should be present");
+		// byte 5 = first frame data
+		Assertions.assertEquals(0x01, data.get(5) & 0xFF, "First frame data should follow lace count");
 	}
 
 	// ========== Helper ==========
