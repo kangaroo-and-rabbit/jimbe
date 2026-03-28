@@ -19,6 +19,9 @@
  */
 package org.atriasoft.jimbe.matroska;
 
+import java.nio.ByteBuffer;
+
+import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.ebml.model.MasterElement;
 import org.atriasoft.jimbe.ebml.model.StringElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
@@ -43,22 +46,42 @@ public class Writer {
 
 	protected DataWriter ioDW;
 
+	private static final int SEGMENT_SIZE_BYTES = 5;
+
 	private final MetaSeek metaSeek;
 	private final Cues cueData;
 	private final Cluster cluster;
 	private final SegmentInfo segmentInfoElem;
 	private final Tracks tracks;
+	private final long segmentSizePosition;
+	private final long segmentDataStart;
+	private String docType = "webm";
 
 	/**
-	 * Creates a new Matroska writer. Immediately writes the EBML header and segment header.
+	 * Creates a new Matroska writer with "webm" DocType for maximum browser compatibility.
+	 * Immediately writes the EBML header and segment header.
 	 *
 	 * @param outputDataWriter the data writer to write to
 	 */
 	public Writer(final DataWriter outputDataWriter) {
+		this(outputDataWriter, "webm");
+	}
+
+	/**
+	 * Creates a new Matroska writer with the specified DocType.
+	 * Immediately writes the EBML header and segment header.
+	 *
+	 * @param outputDataWriter the data writer to write to
+	 * @param docType the DocType string ("webm" for web use, "matroska" for generic files)
+	 */
+	public Writer(final DataWriter outputDataWriter, final String docType) {
+		this.docType = docType;
 		this.ioDW = outputDataWriter;
 		writeEBMLHeader();
 		writeSegmentHeader();
 		final long endOfSegmentHeader = this.ioDW.getFilePointer();
+		this.segmentSizePosition = endOfSegmentHeader - SEGMENT_SIZE_BYTES;
+		this.segmentDataStart = endOfSegmentHeader;
 		this.metaSeek = new MetaSeek(endOfSegmentHeader);
 		this.cueData = new Cues(endOfSegmentHeader);
 		this.metaSeek.write(this.ioDW);
@@ -89,10 +112,10 @@ public class Writer {
 		ebmlMaxSizeLenElem.setValue(8);
 
 		final StringElement docTypeElem = DocTypes.DocType.getInstance();
-		docTypeElem.setValue("matroska");
+		docTypeElem.setValue(this.docType);
 
 		final UnsignedIntegerElement docTypeVersionElem = DocTypes.DocTypeVersion.getInstance();
-		docTypeVersionElem.setValue(3);
+		docTypeVersionElem.setValue("webm".equals(this.docType) ? 4 : 3);
 
 		final UnsignedIntegerElement docTypeReadVersionElem = DocTypes.DocTypeReadVersion.getInstance();
 		docTypeReadVersionElem.setValue(2);
@@ -192,6 +215,9 @@ public class Writer {
 	 * @param frame The frame to add
 	 */
 	public void addFrame(final Frame frame) {
+		if (this.cluster.shouldFlushBefore(frame)) {
+			flush();
+		}
 		if (!this.cluster.addFrame(frame)) {
 			flush();
 		}
@@ -217,5 +243,15 @@ public class Writer {
 		this.metaSeek.update(this.ioDW);
 		this.segmentInfoElem.update(this.ioDW);
 		this.tracks.update(this.ioDW);
+
+		// Patch the Segment size so browsers can seek (unknown size = live stream = no seek)
+		if (this.ioDW.isSeekable()) {
+			final long endPos = this.ioDW.getFilePointer();
+			final long segmentSize = endPos - this.segmentDataStart;
+			final byte[] encodedSize = Element.makeEbmlCodedSize(segmentSize, SEGMENT_SIZE_BYTES);
+			this.ioDW.seek(this.segmentSizePosition);
+			this.ioDW.write(ByteBuffer.wrap(encodedSize));
+			this.ioDW.seek(endPos);
+		}
 	}
 }
