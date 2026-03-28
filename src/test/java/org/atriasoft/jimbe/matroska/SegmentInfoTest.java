@@ -177,7 +177,10 @@ public class SegmentInfoTest {
 		void check(Reader reader) throws Exception;
 	}
 
-	private void writeAndReadBack(final File tempFile, final long timecodeScale, final double duration,
+	private void writeAndReadBack(
+			final File tempFile,
+			final long timecodeScale,
+			final double duration,
 			final ReaderAssertion assertion) throws Exception {
 		final FileDataWriter output = new FileDataWriter(tempFile.getPath());
 		final Writer writer = new Writer(output);

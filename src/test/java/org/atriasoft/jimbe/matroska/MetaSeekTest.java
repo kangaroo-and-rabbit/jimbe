@@ -119,8 +119,8 @@ public class MetaSeekTest {
 			Assertions.assertTrue(segment.isType(DocTypes.Segment.getType()));
 
 			// First child of Segment should be SeekHead
-			final org.atriasoft.jimbe.ebml.model.Element seekHead =
-					((org.atriasoft.jimbe.ebml.model.MasterElement) segment).readNextChild(ebmlReader);
+			final org.atriasoft.jimbe.ebml.model.Element seekHead = ((org.atriasoft.jimbe.ebml.model.MasterElement) segment)
+					.readNextChild(ebmlReader);
 			Assertions.assertNotNull(seekHead);
 			Assertions.assertTrue(seekHead.isType(DocTypes.SeekHead.getType()));
 		}

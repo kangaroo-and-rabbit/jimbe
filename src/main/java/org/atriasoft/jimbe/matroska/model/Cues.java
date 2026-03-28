@@ -60,7 +60,10 @@ public class Cues {
 		LOG.debug("Finished adding matroska cue to cues element");
 	}
 
-	private void addCueTrackPositions(final MasterElement cuePoint, final long positionInFile, final Collection<Integer> trackNumbers) {
+	private void addCueTrackPositions(
+			final MasterElement cuePoint,
+			final long positionInFile,
+			final Collection<Integer> trackNumbers) {
 		for (final Integer trackNumber : trackNumbers) {
 			final MasterElement cueTrackPositions = DocTypes.CueTrackPositions.getInstance();
 
