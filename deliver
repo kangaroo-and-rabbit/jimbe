@@ -1,0 +1,652 @@
+#!/usr/bin/env python3
+"""deliver -- release the repository from 'develop' to 'main'.
+
+The release is driven by 'version.txt':
+
+    develop        0.48.1-dev          (work in progress)
+    release        0.49.0              chosen among major / medium / minor
+    develop        0.49.1-dev          (next work in progress)
+
+What a release does, in order:
+
+  1. check the working tree is clean and 'main' is not ahead of 'develop';
+  2. show every commit made since the last release tag, so the version bump is
+     an informed choice;
+  3. fast-forward 'main' onto 'develop' -- never a merge commit when the
+     history allows a fast-forward;
+  4. write 'version.txt', run '.island/release.bash' (which propagates the
+     version to pom.xml and the dependencies), and commit the release;
+  5. tag it;
+  6. bring 'develop' back on top of it and open the next '-dev' version.
+
+Nothing is pushed: 'deliver push' does that, and 'deliver revert' undoes a
+release that has not been pushed yet.
+
+@author Edouard DUPIN
+@license MPL v2.0
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+RELEASE_SCRIPT = ".island/release.bash"
+VERSION_FILE = "version.txt"
+STATE_FILE = "deliver-state.json"
+RELEASE_MESSAGE = "[RELEASE] Release v{version}"
+DEVELOP_MESSAGE = "[VERSION] update dev tag version"
+TAG_MESSAGE = "[TAG] create tag {tag}"
+DEV_SUFFIX = "dev"
+# Commits that are the release plumbing itself: never worth showing as "what changed".
+PLUMBING_MESSAGES = (RELEASE_MESSAGE.split("{")[0], DEVELOP_MESSAGE, "[DEV] update dev tag version")
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+class Out:
+	"""Console output, coloured only when writing to a terminal."""
+
+	_tty = sys.stdout.isatty()
+
+	RESET = "\033[0m" if _tty else ""
+	BOLD = "\033[1m" if _tty else ""
+	DIM = "\033[2m" if _tty else ""
+	RED = "\033[31m" if _tty else ""
+	GREEN = "\033[32m" if _tty else ""
+	YELLOW = "\033[33m" if _tty else ""
+	BLUE = "\033[34m" if _tty else ""
+
+	@classmethod
+	def title(cls, message: str) -> None:
+		print(f"{cls.BOLD}{cls.BLUE}== {message}{cls.RESET}")
+
+	@classmethod
+	def step(cls, message: str) -> None:
+		print(f"{cls.GREEN} -> {cls.RESET}{message}")
+
+	@classmethod
+	def info(cls, message: str) -> None:
+		print(f"    {message}")
+
+	@classmethod
+	def dim(cls, message: str) -> None:
+		print(f"{cls.DIM}    {message}{cls.RESET}")
+
+	@classmethod
+	def warn(cls, message: str) -> None:
+		print(f"{cls.YELLOW} !! {message}{cls.RESET}")
+
+	@classmethod
+	def error(cls, message: str) -> None:
+		# stdout is buffered while stderr is not: without this flush an error would be printed
+		# before the lines explaining it.
+		sys.stdout.flush()
+		print(f"{cls.RED} ** {message}{cls.RESET}", file=sys.stderr)
+		sys.stderr.flush()
+
+
+class DeliverError(Exception):
+	"""An expected failure: reported without a stack trace."""
+
+
+# ---------------------------------------------------------------------------
+# git plumbing
+# ---------------------------------------------------------------------------
+
+class Git:
+	"""Every git call of the program, rooted at the repository top level."""
+
+	def __init__(self, root: Path) -> None:
+		self.root = root
+
+	def run(self, *args: str, check: bool = True) -> str:
+		result = subprocess.run(
+			["git", *args],
+			cwd=self.root,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+		)
+		if check and result.returncode != 0:
+			raise DeliverError(f"git {' '.join(args)}\n{result.stderr.strip()}")
+		return result.stdout.strip()
+
+	def ok(self, *args: str) -> bool:
+		return subprocess.run(
+			["git", *args],
+			cwd=self.root,
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL,
+		).returncode == 0
+
+	# -- read -------------------------------------------------------------
+
+	def current_branch(self) -> str:
+		return self.run("rev-parse", "--abbrev-ref", "HEAD")
+
+	def rev(self, ref: str) -> str:
+		return self.run("rev-parse", ref)
+
+	def branch_exists(self, name: str) -> bool:
+		return self.ok("show-ref", "--verify", "--quiet", f"refs/heads/{name}")
+
+	def tag_exists(self, name: str) -> bool:
+		return self.ok("show-ref", "--verify", "--quiet", f"refs/tags/{name}")
+
+	def remote_exists(self, name: str) -> bool:
+		return name in self.run("remote").split()
+
+	def is_clean(self) -> bool:
+		return self.run("status", "--porcelain") == ""
+
+	def is_ancestor(self, ancestor: str, descendant: str) -> bool:
+		return self.ok("merge-base", "--is-ancestor", ancestor, descendant)
+
+	def show_file(self, ref: str, path: str) -> str:
+		return self.run("show", f"{ref}:{path}")
+
+	def log(self, revision_range: str, limit: int = 200) -> list:
+		raw = self.run("log", "--no-merges", f"--max-count={limit}", "--format=%h\x1f%s\x1f%an", revision_range)
+		out = []
+		for line in raw.splitlines():
+			if not line:
+				continue
+			sha, subject, author = line.split("\x1f")
+			out.append((sha, subject, author))
+		return out
+
+	def last_release_tag(self, ref: str) -> str:
+		"""Most recent 'v*' tag reachable from the given ref, or an empty string."""
+		result = subprocess.run(
+			["git", "describe", "--tags", "--abbrev=0", "--match", "v*", ref],
+			cwd=self.root,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.DEVNULL,
+			text=True,
+		)
+		return result.stdout.strip() if result.returncode == 0 else ""
+
+	def git_dir(self) -> Path:
+		return (self.root / self.run("rev-parse", "--git-dir")).resolve()
+
+	# -- write ------------------------------------------------------------
+
+	def checkout(self, branch: str) -> None:
+		self.run("checkout", branch)
+
+	def merge_fast_forward(self, branch: str) -> None:
+		self.run("merge", "--ff-only", branch)
+
+	def reset_hard(self, target: str) -> None:
+		self.run("reset", "--hard", target)
+
+	def add_tracked(self) -> None:
+		self.run("add", "-u")
+
+	def commit(self, message: str) -> None:
+		self.run("commit", "--message", message)
+
+	def tag(self, name: str, message: str) -> None:
+		self.run("tag", name, "--message", message)
+
+	def delete_tag(self, name: str) -> None:
+		self.run("tag", "--delete", name)
+
+	def force_branch(self, branch: str, target: str) -> None:
+		self.run("branch", "--force", branch, target)
+
+
+# ---------------------------------------------------------------------------
+# Version handling
+# ---------------------------------------------------------------------------
+
+VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-.](.+))?$")
+
+
+class Version:
+	"""A 'major.medium.minor' version, possibly carrying a '-dev' suffix."""
+
+	def __init__(self, major: int, medium: int, minor: int, suffix: str = "") -> None:
+		self.major = major
+		self.medium = medium
+		self.minor = minor
+		self.suffix = suffix
+
+	@classmethod
+	def parse(cls, raw: str) -> "Version":
+		text = raw.strip()
+		match = VERSION_PATTERN.match(text)
+		if match is None:
+			raise DeliverError(f"Cannot understand the version '{text}' (expected 'X.Y.Z' or 'X.Y.Z-dev')")
+		return cls(int(match.group(1)), int(match.group(2)), int(match.group(3)), match.group(4) or "")
+
+	def __str__(self) -> str:
+		base = f"{self.major}.{self.medium}.{self.minor}"
+		return f"{base}-{self.suffix}" if self.suffix else base
+
+	def released(self, level: str) -> "Version":
+		"""The version this one becomes when released with the given bump level."""
+		if level == "major":
+			return Version(self.major + 1, 0, 0)
+		if level == "medium":
+			return Version(self.major, self.medium + 1, 0)
+		if level == "minor":
+			return Version(self.major, self.medium, self.minor + 1)
+		raise DeliverError(f"Unknown version level '{level}'")
+
+	def next_development(self) -> "Version":
+		"""The '-dev' version opened right after this release."""
+		return Version(self.major, self.medium, self.minor + 1, DEV_SUFFIX)
+
+
+# ---------------------------------------------------------------------------
+# Repository context
+# ---------------------------------------------------------------------------
+
+class Repository:
+	def __init__(self, develop: str, main: str, remote: str) -> None:
+		self.root = self._find_root()
+		self.git = Git(self.root)
+		self.develop = develop
+		self.main = main
+		self.remote = remote
+
+	@staticmethod
+	def _find_root() -> Path:
+		result = subprocess.run(
+			["git", "rev-parse", "--show-toplevel"],
+			stdout=subprocess.PIPE,
+			stderr=subprocess.DEVNULL,
+			text=True,
+		)
+		if result.returncode != 0:
+			raise DeliverError("Not inside a git repository")
+		return Path(result.stdout.strip())
+
+	@property
+	def state_path(self) -> Path:
+		return self.git.git_dir() / STATE_FILE
+
+	def read_version(self, ref: str) -> Version:
+		try:
+			return Version.parse(self.git.show_file(ref, VERSION_FILE))
+		except DeliverError as error:
+			raise DeliverError(f"Cannot read '{VERSION_FILE}' on '{ref}': {error}") from error
+
+	def write_version(self, version: Version) -> None:
+		(self.root / VERSION_FILE).write_text(f"{version}\n", encoding="utf-8")
+
+	def run_release_script(self) -> bool:
+		"""Run '.island/release.bash' if the repository has one. Returns whether it ran."""
+		script = self.root / RELEASE_SCRIPT
+		if not script.exists():
+			return False
+		if not os.access(script, os.X_OK):
+			raise DeliverError(f"'{RELEASE_SCRIPT}' is not executable")
+		Out.step(f"run {RELEASE_SCRIPT}")
+		result = subprocess.run([str(script)], cwd=self.root)
+		if result.returncode != 0:
+			raise DeliverError(f"'{RELEASE_SCRIPT}' failed with code {result.returncode}")
+		return True
+
+	def load_state(self) -> dict:
+		if not self.state_path.exists():
+			raise DeliverError("No release to work on: no state file (nothing was delivered from here)")
+		return json.loads(self.state_path.read_text(encoding="utf-8"))
+
+	def save_state(self, state: dict) -> None:
+		self.state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+	def clear_state(self) -> None:
+		self.state_path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Checks
+# ---------------------------------------------------------------------------
+
+def check_ready(repo: Repository) -> None:
+	"""Everything that must hold before touching anything."""
+	if not repo.git.is_clean():
+		raise DeliverError("The working tree is not clean: commit or stash first")
+	for branch in (repo.develop, repo.main):
+		if not repo.git.branch_exists(branch):
+			raise DeliverError(f"Missing branch '{branch}'")
+	if not (repo.root / VERSION_FILE).exists():
+		raise DeliverError(f"Missing '{VERSION_FILE}' at the repository root")
+	if repo.state_path.exists():
+		state = repo.load_state()
+		raise DeliverError(
+			f"A release is already prepared ({state['tag']}) and not pushed.\n"
+			f"    Push it with './deliver push', or undo it with './deliver revert'"
+		)
+	# 'main' must be an ancestor of 'develop': otherwise the release would either lose
+	# those commits or need a merge commit.
+	if not repo.git.is_ancestor(repo.main, repo.develop):
+		ahead = repo.git.log(f"{repo.develop}..{repo.main}", limit=20)
+		Out.error(f"'{repo.main}' is ahead of '{repo.develop}':")
+		for sha, subject, _ in ahead:
+			Out.info(f"{sha}  {subject}")
+		raise DeliverError(f"Merge '{repo.main}' back into '{repo.develop}' before releasing")
+
+
+def warn_on_remote_drift(repo: Repository) -> None:
+	"""Tell -- without blocking -- when the local branches are behind the remote."""
+	if not repo.git.remote_exists(repo.remote):
+		return
+	for branch in (repo.develop, repo.main):
+		tracking = f"{repo.remote}/{branch}"
+		if not repo.git.ok("show-ref", "--verify", "--quiet", f"refs/remotes/{tracking}"):
+			continue
+		if not repo.git.is_ancestor(tracking, branch):
+			Out.warn(f"'{branch}' is behind '{tracking}': the release may miss commits (git fetch/pull first?)")
+
+
+# ---------------------------------------------------------------------------
+# release
+# ---------------------------------------------------------------------------
+
+def show_commits_since_last_release(repo: Repository) -> int:
+	"""List what changed since the last release. Returns the number of real commits.
+
+	The release plumbing itself ('[RELEASE] ...', '[VERSION] ...') is not counted: right after a
+	release 'develop' always carries one such commit, and it does not make a new release worth it.
+	"""
+	last_tag = repo.git.last_release_tag(repo.develop)
+	revision_range = f"{last_tag}..{repo.develop}" if last_tag else repo.develop
+	commits = [entry for entry in repo.git.log(revision_range) if not entry[1].startswith(PLUMBING_MESSAGES)]
+	origin = f"since {last_tag}" if last_tag else "since the beginning of the history"
+	Out.title(f"Commits {origin} ({len(commits)})")
+	for sha, subject, author in commits:
+		Out.info(f"{Out.DIM}{sha}{Out.RESET}  {subject}  {Out.DIM}({author}){Out.RESET}")
+	return len(commits)
+
+
+def ask_level(current: Version) -> str:
+	"""Ask which part of the version the release bumps."""
+	choices = {
+		"1": ("major", "change API"),
+		"2": ("medium", "add feature"),
+		"3": ("minor", "bug fix & doc"),
+	}
+	Out.title(f"Current version: {current}")
+	for key, (level, description) in choices.items():
+		Out.info(f"({key}) {level:<7} -> {Out.BOLD}{current.released(level)}{Out.RESET}   ({description})")
+	Out.info("(q) quit, release nothing")
+	while True:
+		answer = input("    choice: ").strip().lower()
+		if answer in choices:
+			return choices[answer][0]
+		if answer in ("q", "4", "quit"):
+			raise DeliverError("Release cancelled")
+		Out.warn(f"Answer with {', '.join(choices)} or q")
+
+
+def command_release(repo: Repository, args: argparse.Namespace) -> int:
+	check_ready(repo)
+	warn_on_remote_drift(repo)
+	if show_commits_since_last_release(repo) == 0 and not args.force:
+		raise DeliverError(
+			"Nothing to release: no commit since the last tag, beyond the release plumbing.\n"
+			"    Use --force to tag the same code again anyway"
+		)
+
+	current = repo.read_version(repo.develop)
+	level = args.level if args.level else ask_level(current)
+	release_version = current.released(level)
+	tag_name = f"v{release_version}"
+	if repo.git.tag_exists(tag_name):
+		raise DeliverError(f"The tag '{tag_name}' already exists")
+
+	next_version = release_version.next_development()
+	Out.title(f"Release {release_version}  (then {next_version} on '{repo.develop}')")
+	if args.dry_run:
+		Out.info(f"fast-forward '{repo.main}' onto '{repo.develop}'")
+		Out.info(f"commit  '{RELEASE_MESSAGE.format(version=release_version)}'")
+		Out.info(f"tag     '{tag_name}'")
+		Out.info(f"commit  '{DEVELOP_MESSAGE}' on '{repo.develop}' ({next_version})")
+		Out.warn("dry-run: nothing was modified")
+		return 0
+
+	state = {
+		"tag": tag_name,
+		"version": str(release_version),
+		"main_branch": repo.main,
+		"develop_branch": repo.develop,
+		"main_before": repo.git.rev(repo.main),
+		"develop_before": repo.git.rev(repo.develop),
+		"started_at": datetime.now(timezone.utc).isoformat(),
+	}
+
+	# 1. bring 'main' on the delivered code -- fast-forward only, no merge commit.
+	Out.step(f"fast-forward '{repo.main}' onto '{repo.develop}'")
+	repo.git.checkout(repo.main)
+	repo.git.merge_fast_forward(repo.develop)
+
+	# 2. the release commit itself.
+	Out.step(f"set version {release_version}")
+	repo.write_version(release_version)
+	repo.run_release_script()
+	repo.git.add_tracked()
+	repo.git.commit(RELEASE_MESSAGE.format(version=release_version))
+
+	# 3. tag it.
+	Out.step(f"tag {tag_name}")
+	repo.git.tag(tag_name, TAG_MESSAGE.format(tag=tag_name))
+
+	# 4. reopen the development version on top of the release.
+	Out.step(f"open {next_version} on '{repo.develop}'")
+	repo.git.checkout(repo.develop)
+	repo.git.reset_hard(repo.main)
+	repo.write_version(next_version)
+	repo.run_release_script()
+	repo.git.add_tracked()
+	repo.git.commit(DEVELOP_MESSAGE)
+
+	# Leave the repository on the released branch, ready to push.
+	repo.git.checkout(repo.main)
+
+	state["main_after"] = repo.git.rev(repo.main)
+	state["develop_after"] = repo.git.rev(repo.develop)
+	repo.save_state(state)
+
+	Out.title(f"Released {tag_name}")
+	Out.info(f"{repo.main}    {state['main_after'][:9]}")
+	Out.info(f"{repo.develop} {state['develop_after'][:9]}  ({next_version})")
+	Out.info("Nothing is pushed yet: './deliver push' to publish, './deliver revert' to undo")
+	return 0
+
+
+# ---------------------------------------------------------------------------
+# push
+# ---------------------------------------------------------------------------
+
+def command_push(repo: Repository, args: argparse.Namespace) -> int:
+	if not repo.git.remote_exists(repo.remote):
+		raise DeliverError(f"Unknown remote '{repo.remote}'")
+	state = repo.load_state() if repo.state_path.exists() else None
+	if state is None:
+		Out.warn("No prepared release found: pushing the current state of the branches and the tags")
+	targets = [repo.main, repo.develop]
+	Out.title(f"Push to '{repo.remote}'")
+	if args.dry_run:
+		Out.info(f"git push {repo.remote} {' '.join(targets)}")
+		Out.info(f"git push {repo.remote} --tags")
+		Out.warn("dry-run: nothing was pushed")
+		return 0
+	for branch in targets:
+		Out.step(f"push {branch}")
+		repo.git.run("push", repo.remote, branch)
+	Out.step("push tags")
+	repo.git.run("push", repo.remote, "--tags")
+	if state is not None:
+		# The release is published: it cannot be reverted locally any more.
+		repo.clear_state()
+		# Back on the working branch: the release is done, the next commits belong to 'develop'.
+		if repo.git.current_branch() == repo.main:
+			repo.git.checkout(repo.develop)
+		Out.title(f"Published {state['tag']}")
+		Out.info(f"back on '{repo.develop}'")
+	return 0
+
+
+# ---------------------------------------------------------------------------
+# revert
+# ---------------------------------------------------------------------------
+
+def command_revert(repo: Repository, args: argparse.Namespace) -> int:
+	if not repo.state_path.exists():
+		last_tag = repo.git.last_release_tag(repo.main)
+		hint = ""
+		if last_tag and repo.git.remote_exists(repo.remote) and repo.git.run(
+			"ls-remote", "--tags", repo.remote, f"refs/tags/{last_tag}", check=False
+		):
+			hint = (
+				f"\n    The last release ({last_tag}) is already published: undo it with a new release,"
+				f"\n    not by rewriting a history other people may already have"
+			)
+		raise DeliverError("Nothing to revert: no release was prepared from here." + hint)
+	state = repo.load_state()
+	tag_name = state["tag"]
+	main = state["main_branch"]
+	develop = state["develop_branch"]
+
+	if not repo.git.is_clean():
+		raise DeliverError("The working tree is not clean: commit or stash first")
+
+	# The branches must still be where the release left them, otherwise the recorded
+	# 'before' revisions would throw away work done since.
+	for branch, expected in ((main, state["main_after"]), (develop, state["develop_after"])):
+		if repo.git.rev(branch) != expected:
+			if not args.force:
+				raise DeliverError(
+					f"'{branch}' moved since the release ({repo.git.rev(branch)[:9]} != {expected[:9]}).\n"
+					f"    Reverting would drop that work. Use --force only if you know it is disposable"
+				)
+			Out.warn(f"'{branch}' moved since the release: forced")
+
+	# Refuse to rewrite what is already published.
+	if repo.git.remote_exists(repo.remote):
+		published = repo.git.run("ls-remote", "--tags", repo.remote, f"refs/tags/{tag_name}", check=False)
+		if published and not args.force:
+			raise DeliverError(
+				f"The tag '{tag_name}' is already on '{repo.remote}': the release is published.\n"
+				f"    Reverting it locally would only desynchronize you. Publish a fix instead"
+			)
+
+	Out.title(f"Revert {tag_name}")
+	if args.dry_run:
+		Out.info(f"delete tag {tag_name}")
+		Out.info(f"{main} -> {state['main_before'][:9]}")
+		Out.info(f"{develop} -> {state['develop_before'][:9]}")
+		Out.warn("dry-run: nothing was modified")
+		return 0
+
+	current = repo.git.current_branch()
+	if current != main:
+		repo.git.checkout(main)
+	Out.step(f"reset '{main}' to {state['main_before'][:9]}")
+	repo.git.reset_hard(state["main_before"])
+	Out.step(f"reset '{develop}' to {state['develop_before'][:9]}")
+	repo.git.force_branch(develop, state["develop_before"])
+	if repo.git.tag_exists(tag_name):
+		Out.step(f"delete tag {tag_name}")
+		repo.git.delete_tag(tag_name)
+	repo.clear_state()
+	# Back on the working branch: staying on the release branch invites committing on it by mistake.
+	repo.git.checkout(develop)
+
+	Out.title(f"Reverted {tag_name}")
+	Out.info(f"'{main}' and '{develop}' are back to their state before the release")
+	Out.info(f"back on '{develop}'")
+	return 0
+
+
+# ---------------------------------------------------------------------------
+# status
+# ---------------------------------------------------------------------------
+
+def command_status(repo: Repository, _args: argparse.Namespace) -> int:
+	Out.title(f"Repository {repo.root.name}")
+	Out.info(f"branch        {repo.git.current_branch()}")
+	Out.info(f"{repo.develop:<13} {repo.read_version(repo.develop)}")
+	if repo.git.branch_exists(repo.main):
+		Out.info(f"{repo.main:<13} {repo.read_version(repo.main)}")
+	last_tag = repo.git.last_release_tag(repo.develop)
+	Out.info(f"last tag      {last_tag if last_tag else '(none)'}")
+	Out.info(f"working tree  {'clean' if repo.git.is_clean() else 'DIRTY'}")
+	if repo.state_path.exists():
+		state = repo.load_state()
+		Out.warn(f"release {state['tag']} prepared and not pushed ('deliver push' or 'deliver revert')")
+	else:
+		revision_range = f"{last_tag}..{repo.develop}" if last_tag else repo.develop
+		pending = [entry for entry in repo.git.log(revision_range) if not entry[1].startswith(PLUMBING_MESSAGES)]
+		Out.info(f"unreleased    {len(pending)} commit(s) on '{repo.develop}'")
+	return 0
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+	parser = argparse.ArgumentParser(
+		prog="deliver",
+		description="Release the repository from 'develop' to 'main', based on version.txt.",
+	)
+	parser.add_argument("--from", dest="develop", default="develop", help="source branch (default: develop)")
+	parser.add_argument("--to", dest="main", default="main", help="destination branch (default: main)")
+	parser.add_argument("--remote", default="origin", help="remote used by push/revert (default: origin)")
+	parser.add_argument("-n", "--dry-run", action="store_true", help="show what would be done, change nothing")
+	# Options of a single command, but declared globally: it keeps them usable whatever their
+	# position, and lets 'deliver' alone still mean 'deliver release'.
+	parser.add_argument(
+		"--level",
+		choices=("major", "medium", "minor"),
+		help="release: skip the interactive question and bump this part of the version",
+	)
+	parser.add_argument(
+		"--force",
+		action="store_true",
+		help="release: release even with nothing new; revert: revert even if the branches moved "
+		"or the tag is published",
+	)
+	parser.add_argument(
+		"command",
+		nargs="?",
+		default="release",
+		choices=("release", "push", "revert", "status"),
+		help="what to do (default: release)",
+	)
+	return parser
+
+
+def main(argv: list) -> int:
+	args = build_parser().parse_args(argv)
+
+	commands = {
+		"release": command_release,
+		"push": command_push,
+		"revert": command_revert,
+		"status": command_status,
+	}
+	try:
+		repo = Repository(args.develop, args.main, args.remote)
+		return commands[args.command](repo, args)
+	except DeliverError as error:
+		Out.error(str(error))
+		return 1
+	except KeyboardInterrupt:
+		Out.error("Interrupted")
+		return 130
+
+
+if __name__ == "__main__":
+	sys.exit(main(sys.argv[1:]))
