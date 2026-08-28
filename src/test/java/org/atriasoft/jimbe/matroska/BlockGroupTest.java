@@ -204,8 +204,8 @@ public class BlockGroupTest {
 		final Frame readSimple = reader.getNextFrame();
 		Assertions.assertNotNull(readSimple);
 		Assertions.assertEquals(0, readSimple.getTimecode());
-		// SimpleBlock doesn't carry duration
-		Assertions.assertEquals(0, readSimple.getDuration());
+		// SimpleBlock doesn't carry duration: unset, which is not the same as zero
+		Assertions.assertEquals(Long.MIN_VALUE, readSimple.getDuration());
 
 		final Frame readBlockGroup = reader.getNextFrame();
 		Assertions.assertNotNull(readBlockGroup);

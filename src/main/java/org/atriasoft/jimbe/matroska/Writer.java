@@ -42,6 +42,18 @@ import org.slf4j.LoggerFactory;
  * Primary API entrypoint for writing Matroska files.
  */
 public class Writer {
+	/** How long a cluster may span before it is written out, in milliseconds. */
+	private static final long CLUSTER_DURATION_LIMIT_MS = 5000;
+
+	/** How much a cluster may hold before it is written out, in bytes. */
+	private static final int CLUSTER_SIZE_LIMIT_BYTES = 4 * 1024 * 1024;
+
+	/** How long a cluster must span before a key frame is allowed to end it. */
+	private static final long CLUSTER_MIN_DURATION_MS = 1000;
+
+	/** How much a cluster must hold before a key frame is allowed to end it. */
+	private static final int CLUSTER_MIN_SIZE_BYTES = 512 * 1024;
+
 	private static final Logger LOG = LoggerFactory.getLogger(Writer.class);
 
 	protected DataWriter ioDW;
@@ -92,6 +104,8 @@ public class Writer {
 		this.tracks = new Tracks(this.ioDW.getFilePointer());
 		this.tracks.writeTracks(this.ioDW);
 		this.cluster = new Cluster();
+		this.cluster.setLimitParameters(CLUSTER_DURATION_LIMIT_MS, CLUSTER_SIZE_LIMIT_BYTES);
+		this.cluster.setMinimumParameters(CLUSTER_MIN_DURATION_MS, CLUSTER_MIN_SIZE_BYTES);
 		this.cluster.setLimitParameters(5000, 128 * 1024);
 		this.metaSeek.addIndexedElement(DocTypes.Cluster.getType(), this.ioDW.getFilePointer());
 	}
@@ -227,6 +241,11 @@ public class Writer {
 	 * Flushes pending content to disk and starts a new cluster. This is typically not necessary to call manually.
 	 */
 	public void flush() {
+		if (this.cluster.getTracks().isEmpty()) {
+			// Nothing was added since the last one: an empty cluster would only add an
+			// entry to the index and a few bytes to the file.
+			return;
+		}
 		final long clusterPos = this.ioDW.getFilePointer();
 		this.cueData.addCue(clusterPos, this.cluster.getClusterTimecode(), this.cluster.getTracks());
 		LOG.debug("Cluster flushing, timecode {}", this.cluster.getClusterTimecode());
@@ -237,7 +256,10 @@ public class Writer {
 	 * Finalizes the file by writing the final headers, index, and flushing data to the writer.
 	 */
 	public void close() {
-		flush();
+		// The last cluster still has to go out, empty or not.
+		if (!this.cluster.getTracks().isEmpty()) {
+			flush();
+		}
 
 		this.cueData.write(this.ioDW, this.metaSeek);
 		this.metaSeek.update(this.ioDW);

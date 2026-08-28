@@ -44,6 +44,12 @@ public class Cluster {
 
 	private long clusterTimecode = Long.MAX_VALUE;
 	private int sizeLimit = Integer.MAX_VALUE;
+
+	/** What a cluster must hold before a key frame may close it; 0 keeps the old behaviour. */
+	private int minSize = 0;
+
+	/** What a cluster must span before a key frame may close it; 0 keeps the old behaviour. */
+	private long minDuration = 0;
 	private int totalSize = 0;
 	private long durationLimit = Long.MAX_VALUE;
 
@@ -63,6 +69,21 @@ public class Cluster {
 	}
 
 	/**
+	 * Sets how much a cluster must hold before a key frame is allowed to end it.
+	 *
+	 * <p>
+	 * A cluster has to start on a key frame, so that the cues point at positions one can seek to. Ending it on every key frame is another matter: on a stream where they are frequent, that writes one
+	 * tiny cluster and one index entry per frame, and the index grows with the file until nothing is left to hold it. A cluster may hold several key frames, the cues simply point at the first.
+	 *
+	 * @param duration the span a cluster must reach before a key frame may close it
+	 * @param size the size a cluster must reach before a key frame may close it
+	 */
+	public void setMinimumParameters(final long duration, final int size) {
+		this.minDuration = duration;
+		this.minSize = size;
+	}
+
+	/**
 	 * Checks if the cluster should be flushed before adding this frame.
 	 * Forces cluster boundaries on keyframes so that Cues always point to seekable positions.
 	 *
@@ -70,7 +91,12 @@ public class Cluster {
 	 * @return {@code true} if the cluster should be flushed before adding this frame
 	 */
 	public boolean shouldFlushBefore(final Frame frame) {
-		return frame.isKeyFrame() && !this.frames.isEmpty();
+		if (!frame.isKeyFrame() || this.frames.isEmpty()) {
+			return false;
+		}
+		// Big enough, or long enough: below that the key frame joins the cluster
+		// being built instead of starting a new one of its own.
+		return this.totalSize >= this.minSize || frame.getTimecode() - this.clusterTimecode >= this.minDuration;
 	}
 
 	/**

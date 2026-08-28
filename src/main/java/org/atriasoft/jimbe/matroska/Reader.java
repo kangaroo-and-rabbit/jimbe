@@ -325,7 +325,7 @@ public class Reader {
 			} else if (level2.isType(DocTypes.SimpleBlock.getType())) {
 				level2.readData(this.ioDS);
 				Block block = null;
-				final long blockDuration = 0;
+				final long blockDuration = Long.MIN_VALUE;
 				block = new Block(level2.getData());
 
 				block.parseBlock();
