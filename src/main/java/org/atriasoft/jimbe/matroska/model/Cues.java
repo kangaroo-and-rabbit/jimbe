@@ -94,7 +94,11 @@ public class Cues {
 		final long numberOfBytesInCueData = this.cues.writeElement(ioDW);
 		LOG.debug("Done writing matroska cues, number of bytes was [{}]", numberOfBytesInCueData);
 
-		metaSeek.addIndexedElement(this.cues, getPositionRelativeToSegmentEbmlElement(currentBytePositionInFile));
+		// The index wants where the element is in the file: it makes the position relative to
+		// the segment itself. Handing it one already made relative subtracts that twice, and the
+		// entry then points a little before the cues — into the last cluster, where a player
+		// finds no index at all and falls back to reading the whole file to seek in it.
+		metaSeek.addIndexedElement(this.cues, currentBytePositionInFile);
 
 		return this.cues;
 	}
