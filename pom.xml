@@ -4,7 +4,7 @@
 	<groupId>org.atria-soft</groupId>
 	<artifactId>jimbe</artifactId>
 	<name>jimbe</name>
-	<version>1.1.4</version>
+	<version>1.1.5-SNAPSHOT</version>
 	<description>Jimbe is e refactor of jebml that port in jave the EBML (Extensible Binary Meta Language) and Matroska/WebM.</description>
 	<url>https://github.com/kangaroo-and-rabbit/jimbe</url>
 	<licenses>
