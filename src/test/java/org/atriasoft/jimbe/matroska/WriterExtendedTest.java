@@ -465,4 +465,136 @@ public class WriterExtendedTest {
 		final long[] timecodes = { 3600000, 3600040, 0, 40 };
 		assertFramesReadBack(writeFrames(timecodes), timecodes);
 	}
+
+	// ========== tracks larger than the usual reservation ==========
+
+	private static Track audioTrack(final int number, final int codecPrivateSize) {
+		final Track track = new Track();
+		track.setTrackNo(number);
+		track.setTrackUID(number);
+		track.setTrackType(TrackType.AUDIO);
+		track.setCodecID("A_VORBIS");
+		final byte[] codecPrivate = new byte[codecPrivateSize];
+		codecPrivate[codecPrivateSize - 1] = (byte) number;
+		track.setCodecPrivate(ByteBuffer.wrap(codecPrivate));
+		final AudioTrack audio = new AudioTrack();
+		audio.setChannels((short) 2);
+		audio.setSamplingFrequency(48000);
+		track.setAudio(audio);
+		return track;
+	}
+
+	private static Frame frameOf(final int trackNo, final long timecode) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(trackNo);
+		frame.setTimecode(timecode);
+		frame.setData(ByteBuffer.wrap(new byte[] { (byte) trackNo, 2 }));
+		return frame;
+	}
+
+	private void assertLargeTracksReadBack(final int... codecPrivateSizes) throws Exception {
+		final FileDataSource source = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		final Track[] tracks = reader.getTrackList();
+		Assertions.assertEquals(codecPrivateSizes.length + 1, tracks.length);
+		for (int i = 0; i < codecPrivateSizes.length; i++) {
+			final ByteBuffer codecPrivate = tracks[i + 1].getCodecPrivate();
+			Assertions.assertEquals(codecPrivateSizes[i], codecPrivate.remaining());
+			Assertions.assertEquals((byte) (i + 2), codecPrivate.get(codecPrivate.limit() - 1));
+		}
+		Assertions.assertEquals(0, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(40, reader.getNextFrame().getTimecode());
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+	}
+
+	@Test
+	public void testTracksLargerThanTheUsualBlock() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addTrack(audioTrack(2, 3132));
+		writer.addTrack(audioTrack(3, 3132));
+		writer.addFrame(frameOf(1, 0));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(3132, 3132);
+	}
+
+	@Test
+	public void testTracksThatFillTheUsualBlockExactly() throws Exception {
+		// Around the sizes where the padding left by a 4096 byte block would be 0, 1 or 2 bytes.
+		for (int codecPrivateSize = 3900; codecPrivateSize < 4100; codecPrivateSize++) {
+			final File file = File.createTempFile("test-tracks", ".mkv");
+			final FileDataWriter out = new FileDataWriter(file.getPath());
+			final Writer writer = new Writer(out);
+			writer.addTrack(videoTrack());
+			writer.addTrack(audioTrack(2, codecPrivateSize));
+			writer.addFrame(frameOf(1, 0));
+			writer.close();
+			out.close();
+
+			final FileDataSource source = new FileDataSource(file.getPath());
+			final Reader reader = new Reader(source);
+			reader.readFile();
+			Assertions.assertEquals(codecPrivateSize, reader.getTrackList()[1].getCodecPrivate().remaining());
+			Assertions.assertEquals(0, reader.getNextFrame().getTimecode());
+			source.close();
+			file.delete();
+		}
+	}
+
+	@Test
+	public void testTrackAddedAfterFramesButBeforeTheFirstClusterIsWritten() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.addTrack(audioTrack(2, 6000));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(6000);
+	}
+
+	@Test
+	public void testTrackAddedLateThatStillFits() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.flush();
+		writer.addTrack(audioTrack(2, 500));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(500);
+	}
+
+	@Test
+	public void testTrackAddedLateThatDoesNotFitIsRefusedAtOnce() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.flush();
+		Assertions.assertThrows(IllegalStateException.class, () -> writer.addTrack(audioTrack(2, 8000)));
+		// The refused track leaves the file as it was.
+		writer.addFrame(frameOf(1, 40));
+		writer.close();
+
+		assertLargeTracksReadBack();
+	}
+
+	@Test
+	public void testFileWithoutFrameKeepsItsTracks() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.close();
+
+		final FileDataSource source = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		Assertions.assertEquals(1, reader.getTrackList().length);
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+	}
 }

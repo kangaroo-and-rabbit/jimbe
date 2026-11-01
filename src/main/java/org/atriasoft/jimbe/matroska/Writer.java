@@ -67,6 +67,7 @@ public class Writer {
 	private final Tracks tracks;
 	private final long segmentSizePosition;
 	private final long segmentDataStart;
+	private boolean tracksWritten = false;
 	private String docType = "webm";
 
 	/**
@@ -102,11 +103,23 @@ public class Writer {
 		this.segmentInfoElem.writeElement(this.ioDW);
 		this.metaSeek.addIndexedElement(DocTypes.Tracks.getType(), this.ioDW.getFilePointer());
 		this.tracks = new Tracks(this.ioDW.getFilePointer());
-		this.tracks.writeTracks(this.ioDW);
 		this.cluster = new Cluster();
 		this.cluster.setLimitParameters(CLUSTER_DURATION_LIMIT_MS, CLUSTER_SIZE_LIMIT_BYTES);
 		this.cluster.setMinimumParameters(CLUSTER_MIN_DURATION_MS, CLUSTER_MIN_SIZE_BYTES);
 		this.cluster.setLimitParameters(5000, 128 * 1024);
+	}
+
+	/**
+	 * Tracks wait for the first cluster or for the end of the file, whichever comes first: the room they take
+	 * can not change afterwards, and only now are they all known. A codec private alone can exceed the usual
+	 * block.
+	 */
+	private void writeTracksOnce() {
+		if (this.tracksWritten) {
+			return;
+		}
+		this.tracksWritten = true;
+		this.tracks.writeTracks(this.ioDW);
 		this.metaSeek.addIndexedElement(DocTypes.Cluster.getType(), this.ioDW.getFilePointer());
 	}
 
@@ -196,10 +209,11 @@ public class Writer {
 	}
 
 	/**
-	 * Adds a track to the file. Tracks can be added at any time before {@link #close()},
-	 * even after adding frames for the track.
+	 * Adds a track to the file. Add every track before the first frame: the tracks are written with the first
+	 * cluster, in as much room as they need then. After that a track is only accepted if it fits what is left.
 	 *
 	 * @param track the track to add
+	 * @throws IllegalStateException if the first cluster is written and the track does not fit
 	 */
 	public void addTrack(final Track track) {
 		this.tracks.addTrack(track);
@@ -246,6 +260,7 @@ public class Writer {
 			// entry to the index and a few bytes to the file.
 			return;
 		}
+		writeTracksOnce();
 		final long clusterPos = this.ioDW.getFilePointer();
 		this.cueData.addCue(clusterPos, this.cluster.getClusterTimecode(), this.cluster.getTracks());
 		LOG.debug("Cluster flushing, timecode {}", this.cluster.getClusterTimecode());
@@ -260,6 +275,8 @@ public class Writer {
 		if (!this.cluster.getTracks().isEmpty()) {
 			flush();
 		}
+		// A file without a frame still says what tracks it has.
+		writeTracksOnce();
 
 		this.cueData.write(this.ioDW, this.metaSeek);
 		this.metaSeek.update(this.ioDW);
