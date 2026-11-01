@@ -200,8 +200,7 @@
 				<artifactId>spotbugs-maven-plugin</artifactId>
 				<version>4.10.5.0</version>
 				<configuration>
-					<includeFilterFile>spotbugs-security-include.xml</includeFilterFile>
-					<excludeFilterFile>spotbugs-security-exclude.xml</excludeFilterFile>
+					<excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
 					<!--<plugins>
 						<plugin>
 							<groupId>com.h3xstream.findsecbugs</groupId>
@@ -211,6 +210,15 @@
 					</plugins>
 					-->
 				</configuration>
+				<executions>
+					<execution>
+						<id>spotbugs-check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

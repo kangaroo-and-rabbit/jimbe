@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Findings deliberately kept out of the build. Each one is a reference that has to stay shared:
+	a defensive copy would break the behaviour instead of protecting anything. Match on the exact
+	method and pattern, so that a new finding elsewhere still fails the build.
+-->
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/3.1.0/spotbugs/etc/findbugsfilter.xsd">
+	<!-- The writers receive the sink they write to: it cannot be copied. -->
+	<Match>
+		<Or>
+			<Class name="org.atriasoft.jimbe.ebml.Writer"/>
+			<Class name="org.atriasoft.jimbe.matroska.Writer"/>
+		</Or>
+		<Method name="&lt;init&gt;"/>
+		<Bug pattern="EI_EXPOSE_REP2"/>
+	</Match>
+	<!-- The parent is a link in the element tree: a copy would no longer be the parent. -->
+	<Match>
+		<Class name="org.atriasoft.jimbe.ebml.model.Element"/>
+		<Or>
+			<Method name="getParent"/>
+			<Method name="setParent"/>
+		</Or>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+	</Match>
+	<!--
+		Track owns its video, audio and operation settings and has no invariant on them. With copies,
+		track.getVideo().setPixelWidth(...) would silently change nothing.
+	-->
+	<Match>
+		<Class name="org.atriasoft.jimbe.matroska.model.Track"/>
+		<Or>
+			<Method name="getVideo"/>
+			<Method name="setVideo"/>
+			<Method name="getAudio"/>
+			<Method name="setAudio"/>
+			<Method name="getOperation"/>
+			<Method name="setOperation"/>
+		</Or>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+	</Match>
+</FindBugsFilter>

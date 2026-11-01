@@ -58,10 +58,8 @@ jobs:
         run: mvn compile
       - name: Build with Maven
         run: mvn -B package -DskipTests --file pom.xml
-      - name: spot-bug
-        run: mvn spotbugs:check
-      - name: Test 
-        run: DB_HOST="127.0.0.1" mvn test
+      - name: Test and SpotBugs
+        run: DB_HOST="127.0.0.1" mvn -B verify -Dgpg.skip=true
       - name: find the element
         run: find . -name "dependency-graph.json"
       # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive

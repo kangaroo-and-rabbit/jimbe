@@ -173,6 +173,8 @@ mvn clean install
 
 Requires Java 21+.
 
+`mvn verify` also runs SpotBugs: any finding fails the build. Deliberate exclusions live in `spotbugs-exclude.xml`.
+
 ## License
 
 LGPL v2 - see [LGPL.txt](LGPL.txt).
