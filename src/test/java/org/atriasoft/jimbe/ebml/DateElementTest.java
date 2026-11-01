@@ -1,5 +1,6 @@
 package org.atriasoft.jimbe.ebml;
 
+import java.nio.ByteBuffer;
 import java.util.Date;
 
 import org.atriasoft.jimbe.ebml.model.DateElement;
@@ -74,6 +75,21 @@ public class DateElementTest {
 		elem.setType(DATE_ID);
 		elem.setValue((1716163200000L - 978307200000L) * 1000000L);
 		Assertions.assertEquals(new Date(1716163200000L), elem.getDate());
+	}
+
+	@Test
+	public void testEmptyDateIsTheEbmlEpoch() {
+		final DateElement elem = new DateElement();
+		elem.setType(DATE_ID);
+		elem.setData(ByteBuffer.allocate(0));
+		Assertions.assertEquals(new Date(978307200000L), elem.getDate());
+	}
+
+	@Test
+	public void testDateTooFarIsRefused() {
+		final DateElement elem = new DateElement();
+		elem.setType(DATE_ID);
+		Assertions.assertThrows(ArithmeticException.class, () -> elem.setDate(new Date(Long.MAX_VALUE)));
 	}
 
 	@Test

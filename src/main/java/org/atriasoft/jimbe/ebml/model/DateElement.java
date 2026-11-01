@@ -50,9 +50,10 @@ public class DateElement extends SignedIntegerElement {
 	 * Set the Date of this element
 	 *
 	 * @param value Date to set
+	 * @throws ArithmeticException if the date is too far from 2001 for 64 bits of nanoseconds, about 292 years
 	 */
 	public void setDate(final Date value) {
-		final long val = (value.getTime() - EBML_EPOCH_MS) * NANOS_PER_MS;
+		final long val = Math.multiplyExact(value.getTime() - EBML_EPOCH_MS, NANOS_PER_MS);
 		setData(ByteBuffer.wrap(packInt(val, MIN_SIZE_LENGTH)));
 	}
 
@@ -62,6 +63,10 @@ public class DateElement extends SignedIntegerElement {
 	 * @return Date of this element
 	 */
 	public Date getDate() {
+		// An empty date is valid: it stands for the epoch.
+		if (getSize() == 0) {
+			return new Date(EBML_EPOCH_MS);
+		}
 		return new Date(Math.floorDiv(getValue(), NANOS_PER_MS) + EBML_EPOCH_MS);
 	}
 
