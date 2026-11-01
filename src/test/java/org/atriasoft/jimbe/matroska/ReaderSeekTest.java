@@ -534,4 +534,48 @@ public class ReaderSeekTest {
 		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
 		return frame;
 	}
+
+	@Test
+	public void testClustersOverlappingInTimeLoseNoFrame() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		addVideoTrack(writer);
+		final Track audio = new Track();
+		audio.setTrackNo(2);
+		audio.setTrackType(TrackType.AUDIO);
+		audio.setCodecID("A_OPUS");
+		final AudioTrack audioInfo = new AudioTrack();
+		audioInfo.setChannels((short) 2);
+		audioInfo.setSamplingFrequency(48000);
+		audio.setAudio(audioInfo);
+		writer.addTrack(audio);
+		// The first cluster reaches 5001, the second starts at 4990: the cue for 4995 names the second.
+		writer.addFrame(seekFrame(1, 0, true));
+		writer.addFrame(seekFrame(1, 4994, false));
+		writer.addFrame(seekFrame(1, 5001, false));
+		writer.addFrame(seekFrame(2, 4990, true));
+		writer.addFrame(seekFrame(1, 5040, false));
+		writer.close();
+
+		final Reader reader = openReader();
+		Assertions.assertEquals(4994, reader.seek(4995));
+		Assertions.assertEquals(4994, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(5001, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(4990, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(5040, reader.getNextFrame().getTimecode());
+	}
+
+	@Test
+	public void testDamagedSeekHeadOpensAndSeeks() throws IOException {
+		writeLongFile();
+		final byte[] bytes = Files.readAllBytes(this.destination.toPath());
+		// Every child of the SeekHead announces more than the file holds.
+		for (int i = 0; i + 4 < 256; i++) {
+			if (bytes[i] == 0x53 && bytes[i + 1] == (byte) 0xAB) {
+				bytes[i + 2] = (byte) 0x01;
+				bytes[i + 3] = (byte) 0xFF;
+			}
+		}
+		Files.write(this.destination.toPath(), bytes);
+		assertSeekFindsEveryFrame(openReader());
+	}
 }
