@@ -78,7 +78,7 @@ public class Track {
 	 */
 	@Override
 	public String toString() {
-		StringBuilder s = new StringBuilder().append(new String());
+		StringBuilder s = new StringBuilder();
 
 		s.append("\t\t").append("TrackNo: ").append(getTrackNo()).append("\n");
 		s.append("\t\t").append("TrackUID: ").append(getTrackUID()).append("\n");
@@ -122,10 +122,14 @@ public class Track {
 	 * @param ioDS the data source to read element data from
 	 * @param reader the EBML reader for parsing child elements
 	 * @return the parsed Track instance
+	 * @throws IllegalArgumentException if {@code level2} is not a master element
 	 */
 	public static Track fromElement(final Element level2, final DataSource ioDS, final Reader reader) {
+		if (!(level2 instanceof final MasterElement trackEntry)) {
+			throw new IllegalArgumentException("A track can only be read from a master element");
+		}
 		// TODO: read all possible elements
-		Element level3 = ((MasterElement) level2).readNextChild(reader);
+		Element level3 = trackEntry.readNextChild(reader);
 		Element level4 = null;
 		final Track track = new Track();
 		LOG.debug("Reading track from doc!");
@@ -212,7 +216,7 @@ public class Track {
 
 			}
 			level3.skipData(ioDS);
-			level3 = ((MasterElement) level2).readNextChild(reader);
+			level3 = trackEntry.readNextChild(reader);
 		}
 		LOG.debug("Read track from doc!");
 		return track;
@@ -475,14 +479,18 @@ public class Track {
 		this.codecID = codecID;
 	}
 
-	/** Returns the codec-specific private data, or {@code null} if not set. */
+	/** Returns a duplicate of the codec-specific private data, or {@code null} if not set. */
 	public ByteBuffer getCodecPrivate() {
-		return this.codecPrivate;
+		return duplicateOf(this.codecPrivate);
 	}
 
-	/** Sets the codec-specific private data. */
+	/** Sets the codec-specific private data. The buffer is duplicated. */
 	public void setCodecPrivate(final ByteBuffer codecPrivate) {
-		this.codecPrivate = codecPrivate;
+		this.codecPrivate = duplicateOf(codecPrivate);
+	}
+
+	private static ByteBuffer duplicateOf(final ByteBuffer buffer) {
+		return buffer == null ? null : buffer.duplicate().order(buffer.order());
 	}
 
 	/** Returns the default duration of each frame in nanoseconds. */

@@ -39,8 +39,8 @@ public class Tag {
 	 * @return the formatted string representation
 	 */
 	public String toString(int depth) {
-		StringBuilder s = new StringBuilder().append(new String());
-		String depthIndent = new String();
+		StringBuilder s = new StringBuilder();
+		String depthIndent = "";
 		for (int d = 0; d < depth; d++) {
 			depthIndent += "\t";
 		}

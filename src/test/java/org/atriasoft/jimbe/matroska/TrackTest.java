@@ -1,5 +1,9 @@
 package org.atriasoft.jimbe.matroska;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+import org.atriasoft.jimbe.ebml.model.BinaryElement;
 import org.atriasoft.jimbe.matroska.model.AudioTrack;
 import org.atriasoft.jimbe.matroska.model.Track;
 import org.atriasoft.jimbe.matroska.model.TrackOperation;
@@ -185,5 +189,36 @@ public class TrackTest {
 		final String result = track.toString();
 		Assertions.assertTrue(result.contains("AUDIO"));
 		Assertions.assertTrue(result.contains("48000"));
+	}
+
+	@Test
+	public void testCodecPrivateKeepsItsOwnCursor() {
+		final Track track = new Track();
+		final ByteBuffer codecPrivate = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+		track.setCodecPrivate(codecPrivate);
+		codecPrivate.position(3);
+		track.getCodecPrivate().position(3);
+		Assertions.assertEquals(3, track.getCodecPrivate().remaining());
+	}
+
+	@Test
+	public void testCodecPrivateKeepsItsByteOrder() {
+		final Track track = new Track();
+		track.setCodecPrivate(ByteBuffer.wrap(new byte[] { 1, 2 }).order(ByteOrder.LITTLE_ENDIAN));
+		Assertions.assertEquals(ByteOrder.LITTLE_ENDIAN, track.getCodecPrivate().order());
+	}
+
+	@Test
+	public void testCodecPrivateCanBeCleared() {
+		final Track track = new Track();
+		track.setCodecPrivate(ByteBuffer.wrap(new byte[] { 1 }));
+		track.setCodecPrivate(null);
+		Assertions.assertNull(track.getCodecPrivate());
+	}
+
+	@Test
+	public void testFromElementRejectsANonMasterElement() {
+		final BinaryElement notATrackEntry = new BinaryElement();
+		Assertions.assertThrows(IllegalArgumentException.class, () -> Track.fromElement(notATrackEntry, null, null));
 	}
 }
