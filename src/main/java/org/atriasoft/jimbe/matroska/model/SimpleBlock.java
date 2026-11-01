@@ -202,10 +202,14 @@ public class SimpleBlock {
 	/**
 	 * Sets the timecode of this block relative to the containing cluster.
 	 *
-	 * @param timecode the timecode value (must fit in a {@code short})
+	 * @param timecode the timecode value
+	 * @throws IllegalArgumentException if the value does not fit in a {@code short}: cast to fit, it would
+	 *         silently move the frame
 	 */
 	public void setTimecode(final long timecode) {
-		assert timecode < Short.MAX_VALUE;
+		if (timecode < Short.MIN_VALUE || timecode > Short.MAX_VALUE) {
+			throw new IllegalArgumentException("A block timecode must fit in 16 bits: " + timecode);
+		}
 		this.timecode = (short) timecode;
 	}
 

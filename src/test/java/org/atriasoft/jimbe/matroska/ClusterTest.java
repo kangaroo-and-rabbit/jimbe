@@ -317,4 +317,59 @@ public class ClusterTest {
 		final Collection<Integer> tracks = cluster.getTracks();
 		Assertions.assertThrows(UnsupportedOperationException.class, () -> tracks.add(2));
 	}
+
+	// ========== 16 bit block timecodes ==========
+
+	private static Frame frameAt(final long timecode, final boolean keyFrame) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setTimecode(timecode);
+		frame.setKeyFrame(keyFrame);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		return frame;
+	}
+
+	@Test
+	public void testFlushBeforeAFrameTooLate() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(1000, false));
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(1000 + Short.MAX_VALUE, false)));
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameAt(1000 + Short.MAX_VALUE + 1, false)));
+	}
+
+	@Test
+	public void testFlushBeforeAFrameTooEarly() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(40000, false));
+		cluster.addFrame(frameAt(40100, false));
+		// The frame would become the cluster timecode, and the block at 40100 could no longer reach it.
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(40100 - Short.MAX_VALUE, false)));
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameAt(40100 - Short.MAX_VALUE - 1, false)));
+	}
+
+	@Test
+	public void testRangeIsForgottenAfterFlush() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(30000, false));
+		cluster.flush(this.writer);
+		cluster.addFrame(frameAt(100000, false));
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(100001, false)));
+	}
+
+	@Test
+	public void testLastOffsetInRangeIsWritten() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(Short.MAX_VALUE, false));
+		Assertions.assertTrue(cluster.flush(this.writer) > 0);
+	}
+
+	@Test
+	public void testFlushRefusesATimecodeOutOfRange() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(Short.MAX_VALUE + 1L, false));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> cluster.flush(this.writer));
+	}
 }

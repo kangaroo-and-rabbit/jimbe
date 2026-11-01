@@ -453,4 +453,16 @@ public class WriterExtendedTest {
 		final long[] timecodes = { 0, 2000, 2000, 2000, 2000 };
 		assertFramesReadBack(writeFrames(timecodes), timecodes);
 	}
+
+	@Test
+	public void testFrameFarAfterTheOthersKeepsItsTimecode() throws Exception {
+		final long[] timecodes = { 1000, 3600000, 3600040 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
+
+	@Test
+	public void testFrameFarBeforeTheOthersKeepsItsTimecode() throws Exception {
+		final long[] timecodes = { 3600000, 3600040, 0, 40 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
 }

@@ -331,4 +331,20 @@ public class SimpleBlockTest {
 		Assertions.assertFalse(block.addFrame(frame));
 		Assertions.assertEquals(100, block.getDuration());
 	}
+
+	@Test
+	public void testTimecodeLimitsAreAccepted() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setTimecode(Short.MAX_VALUE);
+		Assertions.assertEquals(Short.MAX_VALUE, block.getTimecode());
+		block.setTimecode(Short.MIN_VALUE);
+		Assertions.assertEquals(Short.MIN_VALUE, block.getTimecode());
+	}
+
+	@Test
+	public void testTimecodeOutOfRangeIsRefused() {
+		final SimpleBlock block = new SimpleBlock();
+		Assertions.assertThrows(IllegalArgumentException.class, () -> block.setTimecode(Short.MAX_VALUE + 1L));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> block.setTimecode(Short.MIN_VALUE - 1L));
+	}
 }

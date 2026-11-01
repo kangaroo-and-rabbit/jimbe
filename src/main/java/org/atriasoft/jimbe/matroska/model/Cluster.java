@@ -44,6 +44,9 @@ public class Cluster {
 	private final List<Long> sliencedTracks = new ArrayList<>();
 
 	private long clusterTimecode = Long.MAX_VALUE;
+
+	/** The latest timecode in this cluster: with the earliest, what the blocks have to reach. */
+	private long latestTimecode = Long.MIN_VALUE;
 	private int sizeLimit = Integer.MAX_VALUE;
 
 	/** What a cluster must hold before a key frame may close it; 0 keeps the old behaviour. */
@@ -87,12 +90,19 @@ public class Cluster {
 	/**
 	 * Checks if the cluster should be flushed before adding this frame.
 	 * Forces cluster boundaries on keyframes so that Cues always point to seekable positions.
+	 * Also forced when a block could not reach the frame from the cluster timecode.
 	 *
 	 * @param frame the frame about to be added
 	 * @return {@code true} if the cluster should be flushed before adding this frame
 	 */
 	public boolean shouldFlushBefore(final Frame frame) {
-		if (!frame.isKeyFrame() || this.frames.isEmpty()) {
+		if (this.frames.isEmpty()) {
+			return false;
+		}
+		if (exceedsBlockRange(frame.getTimecode())) {
+			return true;
+		}
+		if (!frame.isKeyFrame()) {
 			return false;
 		}
 		// Big enough, or long enough: below that the key frame joins the cluster
@@ -101,7 +111,17 @@ public class Cluster {
 	}
 
 	/**
-	 * Adds a frame to the cluster.
+	 * A block stores its timecode on 16 signed bits, relative to the earliest frame of the cluster. A frame
+	 * that arrives too late breaks that, and so does one that arrives too early, since it moves the cluster
+	 * timecode away from the frames already held.
+	 */
+	private boolean exceedsBlockRange(final long timecode) {
+		return Math.max(this.latestTimecode, timecode) - Math.min(this.clusterTimecode, timecode) > Short.MAX_VALUE;
+	}
+
+	/**
+	 * Adds a frame to the cluster. Call {@link #shouldFlushBefore(Frame)} first: {@link #flush(DataWriter)} fails
+	 * on frames that are too far apart for a single cluster.
 	 *
 	 * @param frame the frame to add
 	 * @return {@code false} if the cluster limits have been exceeded and a new cluster should be started
@@ -110,6 +130,9 @@ public class Cluster {
 		// Is this the earliest timecode?
 		if (frame.getTimecode() < this.clusterTimecode) {
 			this.clusterTimecode = frame.getTimecode();
+		}
+		if (frame.getTimecode() > this.latestTimecode) {
+			this.latestTimecode = frame.getTimecode();
 		}
 		this.frames.add(frame);
 		this.totalSize += frame.getData().remaining();
@@ -171,6 +194,7 @@ public class Cluster {
 			this.tracks.clear();
 			this.totalSize = 0;
 			this.clusterTimecode = Long.MAX_VALUE;
+			this.latestTimecode = Long.MIN_VALUE;
 		}
 	}
 
