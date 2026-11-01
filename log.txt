@@ -6,3 +6,18 @@
 - GitHub Actions : checkout v7, setup-java v6, maven-dependency-submission-action v6.0.1, action-check-pr-title v6.0.0.
 - Décision : ne pas copier les filtres SpotBugs d'archidata. Leur include vide désactive l'analyse (0 bug au lieu de 35), la CI serait verte sans rien vérifier.
 - Reste ouvert : l'étape spot-bug de la CI échoue (spotbugs-security-include.xml absent), ce qui empêche les étapes test et dependency graph de s'exécuter.
+
+2026-11-01 - Correction des constats SpotBugs et contrôle dans le build
+- Les 35 constats sont traités : 25 corrigés, 10 exclus dans spotbugs-exclude.xml (writers, parent d'Element, sous-objets de Track) car une copie casserait le comportement.
+- spotbugs:check est lié à la phase verify. Le filtre include est supprimé : un include vide neutralise l'analyse. La CI lance mvn verify -Dgpg.skip=true.
+- Contrôle vérifié : un bug injecté fait échouer verify (DM_STRING_VOID_CTOR), et sans le filtre SpotBugs remonte exactement les 10 constats exclus.
+- ByteBuffer : duplicate() aux frontières (contenu partagé, curseur propre), jamais asReadOnlyBuffer() car le code lit array().
+- Changements d'API : Cues.write() ne retourne plus rien (valeur jamais lue), VoidElement est final. BinaryElement n'a plus son propre minSizeLength : il hérite de celui d'Element, et sa valeur par défaut passe de 4 à 0. Aucun code n'utilise cette valeur.
+- Track.fromElement() lève IllegalArgumentException au lieu de ClassCastException sur un élément qui n'est pas un master.
+- Remux avant/après sur tools/test-videos : 16 lectures et 12 remux identiques, seek compris, hors date du segment.
+- Bug existant non traité : Tracks réserve 4096 octets, et le Writer plante sur les 4 vidéos à 2 pistes audio (IllegalArgumentException dans VoidElement), avant comme après.
+- Bug existant non traité : FloatElement.setValue() écrit un double dans un buffer de 4 octets pour les valeurs >= Float.MAX_VALUE.
+- Revue avant push : Frame.getReferences() retourne une List en lecture seule (au lieu d'un ArrayList copié, où un add() ne faisait plus rien sans erreur), seek() prend fillLock, Track conserve l'ordre d'octets du codec private, Element.setData() invalide le cache de headersSize, le constructeur de copie de Frame accepte une frame sans données, SegmentInfo.setDate(null) échoue dès l'appel.
+- Reader reste prévu pour un usage séquentiel : fillLock sérialise seek() et le remplissage de la file, mais readFile() doit se terminer avant tout autre appel.
+- Aucun appel à getReferences(), Cues, Track.fromElement(), minSizeLength ni sous-classe de VoidElement dans les autres projets de ~/dev/perso.
+- Bug existant non traité : la taille de la dernière frame lacée (Xiph et EBML) soustrait headerSize alors que remaining() l'exclut déjà. BlockTest le note comme connu : l'audio lacé perd des octets à la lecture.
