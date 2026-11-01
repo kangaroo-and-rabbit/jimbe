@@ -30,6 +30,9 @@ public class SimpleBlock {
 
 	// Note: this max size based on libmatroska src
 	private static final int MAX_LACE_SIZE = 6 * 0xFF;
+
+	/** A lace size is a frame size, an int: 5 bytes of EBML hold it, and the difference of two. */
+	private static final int MAX_EBML_SIZE_BYTES = 5;
 	private int trackNumber = 0;
 	private short timecode = 0;
 	private boolean keyFrame = true;
@@ -92,17 +95,6 @@ public class SimpleBlock {
 	}
 
 	private ByteBuffer createInnerData() {
-		final ByteBuffer buf = ByteBuffer.allocate(this.totalSize);
-
-		assert this.trackNumber < 0x4000;
-		if (this.trackNumber < 0x80) {
-			buf.put((byte) (this.trackNumber | 0x80));
-		} else {
-			buf.put((byte) (this.trackNumber >> 8 | 0x40));
-			buf.put((byte) (this.trackNumber & 0xFF));
-		}
-
-		buf.putShort(this.timecode);
 		// Matroska SimpleBlock flags byte (big-endian bit numbering):
 		// bit 7 (0x80): keyframe
 		// bit 3 (0x08): invisible
@@ -139,6 +131,17 @@ public class SimpleBlock {
 			default:
 				break;
 		}
+		final ByteBuffer buf = ByteBuffer.allocate(this.totalSize + (sizes == null ? 0 : sizes.remaining()));
+
+		assert this.trackNumber < 0x4000;
+		if (this.trackNumber < 0x80) {
+			buf.put((byte) (this.trackNumber | 0x80));
+		} else {
+			buf.put((byte) (this.trackNumber >> 8 | 0x40));
+			buf.put((byte) (this.trackNumber & 0xFF));
+		}
+
+		buf.putShort(this.timecode);
 		buf.put(flags);
 		if (sizes != null) {
 			buf.put(sizes);
@@ -160,6 +163,11 @@ public class SimpleBlock {
 
 	private ByteBuffer fixedEncodeLaceSizes() {
 		LOG.trace("Encoding fixed lace sizes");
+		for (final Frame frame : this.frames) {
+			if (frame.getData().remaining() != this.frames.get(0).getData().remaining()) {
+				throw new IllegalStateException("Fixed lacing needs frames of one size");
+			}
+		}
 		final ByteBuffer buf = ByteBuffer.allocate(1);
 		buf.put((byte) (this.frames.size() - 1));
 		buf.flip();
@@ -168,7 +176,11 @@ public class SimpleBlock {
 
 	private ByteBuffer xiphEncodeLaceSizes() {
 		LOG.trace("Encoding xiph lace sizes");
-		final ByteBuffer buf = ByteBuffer.allocate(30);
+		int length = 1;
+		for (int i = 0; i < this.frames.size() - 1; ++i) {
+			length += this.frames.get(i).getData().remaining() / 0xFF + 1;
+		}
+		final ByteBuffer buf = ByteBuffer.allocate(length);
 		buf.put((byte) (this.frames.size() - 1));
 		for (int i = 0; i < this.frames.size() - 1; ++i) {
 			int tmpSize = this.frames.get(i).getData().remaining();
@@ -184,14 +196,28 @@ public class SimpleBlock {
 
 	private ByteBuffer ebmlEncodeLaceSizes() {
 		LOG.trace("Encoding ebml lace sizes");
-		final ByteBuffer buf = ByteBuffer.allocate(30);
+		final ByteBuffer buf = ByteBuffer.allocate(1 + this.frames.size() * MAX_EBML_SIZE_BYTES);
 		buf.put((byte) (this.frames.size() - 1));
+		int previousSize = 0;
 		for (int i = 0; i < this.frames.size() - 1; ++i) {
-			final int tmpSize = this.frames.get(i).getData().remaining();
-			buf.put(Element.makeEbmlCodedSize(tmpSize));
+			final int size = this.frames.get(i).getData().remaining();
+			// The first size is absolute, each of the others is relative to the one before.
+			buf.put(i == 0 ? Element.makeEbmlCodedSize(size) : makeSignedEbmlCodedSize(size - previousSize));
+			previousSize = size;
 		}
 		buf.flip();
 		return buf;
+	}
+
+	/** A signed value is stored shifted by half of what its length can hold: 0 is 63 on one byte. */
+	private static byte[] makeSignedEbmlCodedSize(final long value) {
+		for (int length = 1; length <= MAX_EBML_SIZE_BYTES; length++) {
+			final long shift = (1L << (7 * length - 1)) - 1;
+			if (Math.abs(value) <= shift) {
+				return Element.makeEbmlCodedSize(value + shift, length);
+			}
+		}
+		throw new IllegalArgumentException("Too large for a lace size: " + value);
 	}
 
 	/** Returns the timecode of this block relative to the containing cluster. */
@@ -263,7 +289,10 @@ public class SimpleBlock {
 		}
 
 		if (frame.getData().remaining() > MAX_LACE_SIZE) {
-			this.laceMode = LaceMode.NONE;
+			// A block already holding frames stays laced: without the sizes they could not be told apart.
+			if (this.frames.size() == 1) {
+				this.laceMode = LaceMode.NONE;
+			}
 			return false;
 		}
 		this.totalSize += 4;

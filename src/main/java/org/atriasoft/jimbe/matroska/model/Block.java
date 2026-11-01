@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.atriasoft.jimbe.ebml.Reader;
-import org.atriasoft.jimbe.ebml.model.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
