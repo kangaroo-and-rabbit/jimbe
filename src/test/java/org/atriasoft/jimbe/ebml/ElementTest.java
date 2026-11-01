@@ -200,4 +200,31 @@ public class ElementTest {
 		child.setParent(parent);
 		Assertions.assertSame(parent, child.getParent());
 	}
+
+	@Test
+	public void testSetDataKeepsItsOwnCursor() {
+		final BinaryElement elem = new BinaryElement(new byte[] { (byte) 0xA1 });
+		final ByteBuffer data = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+		elem.setData(data);
+		data.position(2);
+		Assertions.assertEquals(3, elem.getData().remaining());
+		Assertions.assertEquals(3, elem.getSize());
+	}
+
+	@Test
+	public void testSetDataRecomputesTheHeaderSize() {
+		final BinaryElement elem = new BinaryElement(new byte[] { (byte) 0xA1 });
+		elem.setHeadersSize(2);
+		elem.setData(ByteBuffer.allocate(20000));
+		Assertions.assertEquals(1 + Element.codedSizeLength(20000, 0) + 20000, elem.getTotalSize());
+	}
+
+	@Test
+	public void testSetTypeBufferKeepsItsOwnCursor() {
+		final BinaryElement elem = new BinaryElement();
+		final ByteBuffer type = ByteBuffer.wrap(new byte[] { (byte) 0x42, (byte) 0x86 });
+		elem.setType(type);
+		type.position(1);
+		Assertions.assertEquals(2, elem.getType().remaining());
+	}
 }

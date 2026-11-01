@@ -309,4 +309,12 @@ public class ClusterTest {
 		frame.setData(ByteBuffer.wrap(data));
 		return frame;
 	}
+
+	@Test
+	public void testGetTracksIsReadOnly() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(makeFrame(1, 0, true, new byte[] { 0x01 }));
+		final Collection<Integer> tracks = cluster.getTracks();
+		Assertions.assertThrows(UnsupportedOperationException.class, () -> tracks.add(2));
+	}
 }

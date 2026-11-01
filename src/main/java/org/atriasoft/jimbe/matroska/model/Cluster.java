@@ -21,6 +21,7 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -178,9 +179,9 @@ public class Cluster {
 		return this.clusterTimecode;
 	}
 
-	/** Returns the set of track numbers that have frames in this cluster. */
+	/** Returns a read-only view of the track numbers that have frames in this cluster. */
 	public Collection<Integer> getTracks() {
-		return this.tracks;
+		return Collections.unmodifiableSet(this.tracks);
 	}
 
 	/**

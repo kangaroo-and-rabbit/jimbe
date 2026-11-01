@@ -2,7 +2,6 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.util.Collection;
 
-import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.ebml.model.MasterElement;
 import org.atriasoft.jimbe.ebml.model.UnsignedIntegerElement;
 import org.atriasoft.jimbe.io.DataWriter;
@@ -86,9 +85,8 @@ public class Cues {
 	 *
 	 * @param ioDW the data writer to write to
 	 * @param metaSeek the MetaSeek index to register this element in
-	 * @return the written Cues element
 	 */
-	public Element write(final DataWriter ioDW, final MetaSeek metaSeek) {
+	public void write(final DataWriter ioDW, final MetaSeek metaSeek) {
 		final long currentBytePositionInFile = ioDW.getFilePointer();
 		LOG.debug("Writing matroska cues at file byte position [{}]", currentBytePositionInFile);
 		final long numberOfBytesInCueData = this.cues.writeElement(ioDW);
@@ -99,8 +97,6 @@ public class Cues {
 		// entry then points a little before the cues — into the last cluster, where a player
 		// finds no index at all and falls back to reading the whole file to seek in it.
 		metaSeek.addIndexedElement(this.cues, currentBytePositionInFile);
-
-		return this.cues;
 	}
 
 	private long getPositionRelativeToSegmentEbmlElement(final long currentBytePositionInFile) {

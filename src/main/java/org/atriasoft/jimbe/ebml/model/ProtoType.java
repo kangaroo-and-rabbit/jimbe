@@ -98,10 +98,10 @@ public class ProtoType<T extends Element> {
 	/**
 	 * Returns the EBML element ID bytes for this prototype.
 	 *
-	 * @return the type ID buffer
+	 * @return a duplicate of the type ID buffer, whose position the caller can move freely
 	 */
 	public ByteBuffer getType() {
-		return this.type;
+		return this.type.duplicate();
 	}
 
 }

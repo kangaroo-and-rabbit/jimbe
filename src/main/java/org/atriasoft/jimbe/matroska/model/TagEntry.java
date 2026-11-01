@@ -35,7 +35,7 @@ public class TagEntry {
 
 	@Override
 	public String toString() {
-		StringBuilder s = new StringBuilder().append(new String());
+		StringBuilder s = new StringBuilder();
 
 		if (this.trackUID.size() > 0) {
 			s.append("\t\t").append("TrackUID: ").append(this.trackUID.toString()).append("\n");

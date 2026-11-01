@@ -30,7 +30,7 @@ import org.atriasoft.jimbe.io.DataWriter;
 /**
  * Void element. Doesn't do anything but take up space for later use.
  */
-public class VoidElement extends Element {
+public final class VoidElement extends Element {
 	private static final long MAX_SIZE = (long) (Math.pow(2, 56) - 2);
 	private long realSize;
 

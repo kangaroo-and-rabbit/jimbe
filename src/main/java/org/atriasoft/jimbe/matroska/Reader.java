@@ -57,25 +57,25 @@ public class Reader {
 	protected static final Logger LOG = LoggerFactory.getLogger(Reader.class);
 
 	static {
-		// References DocTypes to force static init of its memebers
-		DocTypes.Void.getLevel();
+		DocTypes.ensureRegistered();
 	}
 
 	private final DataSource ioDS;
 	private final org.atriasoft.jimbe.ebml.Reader reader;
+	private final Object fillLock = new Object();
 	private Element level0 = null;
 	private String segmentTitle;
 	private Date segmentDate;
 	private String muxingApp;
 	private String writingApp;
-	private long timecodeScale = 1000000;
-	private double duration;
+	private volatile long timecodeScale = 1000000;
+	private volatile double duration;
 	private final ArrayList<Track> trackList = new ArrayList<>();
 	private final ArrayList<TagEntry> tagList = new ArrayList<>();
 	private final Queue<Frame> frameQueue = new ConcurrentLinkedQueue<>();
-	private boolean scanFirstCluster = true;
-	private long firstClusterFilePosition = -1;
-	private long usedSizeBeforeFirstCluster = 0;
+	private volatile boolean scanFirstCluster = true;
+	private volatile long firstClusterFilePosition = -1;
+	private volatile long usedSizeBeforeFirstCluster = 0;
 
 	/**
 	 * Primary Constructor for Matroska File class.
@@ -238,6 +238,12 @@ public class Reader {
 	 * @return the actual timecode reached, or {@code 0} if no frame was found
 	 */
 	public long seek(final long timecode) {
+		synchronized (this.fillLock) {
+			return seekLocked(timecode);
+		}
+	}
+
+	private long seekLocked(final long timecode) {
 		if (this.level0 == null) {
 			throw new IllegalStateException("Call readFile() before seeking");
 		}
@@ -296,7 +302,7 @@ public class Reader {
 			throw new java.lang.IllegalStateException("Call readFile() before reading frames");
 		}
 
-		synchronized (this.level0) {
+		synchronized (this.fillLock) {
 			Element level1 = ((MasterElement) this.level0).readNextChild(this.reader);
 			while (level1 != null) {
 				if (level1.isType(DocTypes.Cluster.getType())) {
