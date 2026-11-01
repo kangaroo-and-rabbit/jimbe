@@ -21,6 +21,8 @@ package org.atriasoft.jimbe.matroska.model;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,11 +61,9 @@ public class Frame {
 		setTimecode(copy.getTimecode());
 		setDuration(copy.getDuration());
 		setKeyFrame(copy.isKeyFrame());
-		if (copy.getReferences() != null) {
-			this.references.addAll(copy.getReferences());
-		}
-		if (copy.getData() != null) {
-			setData(copy.getData().duplicate());
+		this.references.addAll(copy.references);
+		if (copy.data != null) {
+			setData(copy.data);
 		}
 	}
 
@@ -95,9 +95,9 @@ public class Frame {
 		this.trackNo = trackNo;
 	}
 
-	/** Returns the list of timecode references to other frames. */
-	public ArrayList<Long> getReferences() {
-		return this.references;
+	/** Returns a read-only view of the timecode references to other frames. */
+	public List<Long> getReferences() {
+		return Collections.unmodifiableList(this.references);
 	}
 
 	/**

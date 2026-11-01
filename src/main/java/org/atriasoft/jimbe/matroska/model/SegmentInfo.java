@@ -102,14 +102,14 @@ public class SegmentInfo {
 		this.duration = duration;
 	}
 
-	/** Returns the creation date of the segment. */
+	/** Returns a copy of the creation date of the segment. */
 	public Date getDate() {
-		return this.segmentDate;
+		return new Date(this.segmentDate.getTime());
 	}
 
-	/** Sets the creation date of the segment. */
+	/** Sets the creation date of the segment. The date is copied. */
 	public void setDate(final Date date) {
-		this.segmentDate = date;
+		this.segmentDate = new Date(date.getTime());
 	}
 
 	/** Returns the timecode scale in nanoseconds (default is 1000000, i.e., 1ms). */

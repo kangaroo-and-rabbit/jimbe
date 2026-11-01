@@ -206,4 +206,21 @@ public class SegmentInfoTest {
 			assertion.check(reader);
 		}
 	}
+
+	@Test
+	public void testSetDateCopiesTheDate() {
+		final SegmentInfo info = new SegmentInfo(0);
+		final java.util.Date date = new java.util.Date(1000000000000L);
+		info.setDate(date);
+		date.setTime(0);
+		Assertions.assertEquals(1000000000000L, info.getDate().getTime());
+	}
+
+	@Test
+	public void testGetDateReturnsACopy() {
+		final SegmentInfo info = new SegmentInfo(0);
+		info.setDate(new java.util.Date(1000000000000L));
+		info.getDate().setTime(0);
+		Assertions.assertEquals(1000000000000L, info.getDate().getTime());
+	}
 }

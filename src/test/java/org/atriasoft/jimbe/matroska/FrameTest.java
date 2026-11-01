@@ -114,4 +114,17 @@ public class FrameTest {
 		Assertions.assertEquals(1, original.getReferences().size());
 		Assertions.assertEquals(2, copy.getReferences().size());
 	}
+
+	@Test
+	public void testGetReferencesIsReadOnly() {
+		final Frame frame = new Frame();
+		frame.addReferences(100L);
+		Assertions.assertThrows(UnsupportedOperationException.class, () -> frame.getReferences().add(200L));
+	}
+
+	@Test
+	public void testCopyOfAFrameWithoutData() {
+		final Frame copy = new Frame(new Frame());
+		Assertions.assertTrue(copy.getReferences().isEmpty());
+	}
 }
