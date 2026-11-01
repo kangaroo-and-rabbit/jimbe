@@ -147,9 +147,8 @@ public class BlockTest {
 		// Verify non-last frames are correctly sized
 		Assertions.assertEquals(3, block.getFrame(0).remaining());
 		Assertions.assertEquals(2, block.getFrame(1).remaining());
-		// Note: last frame size calculation in readXiphLaceSizes has a known bug
-		// where headerSize is subtracted from data.remaining() even though
-		// remaining() already excludes consumed header bytes
+		Assertions.assertEquals(4, block.getFrame(2).remaining());
+		Assertions.assertEquals(0x06, block.getFrame(2).get());
 	}
 
 	@Test
@@ -177,7 +176,7 @@ public class BlockTest {
 		Assertions.assertEquals(2, block.getFrameCount());
 		// First frame correctly parsed at 300 bytes
 		Assertions.assertEquals(300, block.getFrame(0).remaining());
-		// Note: last frame size has a known calculation bug in readXiphLaceSizes
+		Assertions.assertEquals(10, block.getFrame(1).remaining());
 	}
 
 	@Test
@@ -209,7 +208,92 @@ public class BlockTest {
 		// Non-last frames are correctly parsed
 		Assertions.assertEquals(3, block.getFrame(0).remaining());
 		Assertions.assertEquals(3, block.getFrame(1).remaining());
-		// Note: last frame size has a known calculation bug in readEBMLLaceSizes
+		Assertions.assertEquals(2, block.getFrame(2).remaining());
+		Assertions.assertEquals(0x07, block.getFrame(2).get());
+	}
+
+	@Test
+	public void testParseEBMLLacingNegativeDelta() {
+		final ByteBuffer buf = ByteBuffer.allocate(16);
+		buf.put((byte) 0x81);
+		buf.putShort((short) 0);
+		buf.put((byte) (0x80 | 0x06)); // keyframe + EBML lacing
+		buf.put((byte) 2); // 3 frames
+		buf.put((byte) 0x83); // first frame: 3 bytes
+		buf.put((byte) (0x80 | (63 - 2))); // second frame: 3 - 2 = 1 byte
+		buf.put(new byte[] { 1, 2, 3, 4, 5, 6 });
+		buf.flip();
+
+		final Block block = new Block(buf);
+		block.parseBlock();
+
+		Assertions.assertEquals(3, block.getFrame(0).remaining());
+		Assertions.assertEquals(1, block.getFrame(1).remaining());
+		Assertions.assertEquals(2, block.getFrame(2).remaining());
+		Assertions.assertEquals(5, block.getFrame(2).get());
+	}
+
+	@Test
+	public void testParseLacingWithOneFrame() {
+		// A count of 0 means one frame: no size is stored, it takes the whole payload.
+		for (final int laceFlag : new int[] { 0x02, 0x04, 0x06 }) {
+			final ByteBuffer buf = ByteBuffer.allocate(8);
+			buf.put((byte) 0x81);
+			buf.putShort((short) 0);
+			buf.put((byte) (0x80 | laceFlag));
+			buf.put((byte) 0);
+			buf.put(new byte[] { 1, 2, 3 });
+			buf.flip();
+
+			final Block block = new Block(buf);
+			block.parseBlock();
+
+			Assertions.assertEquals(1, block.getFrameCount());
+			Assertions.assertEquals(3, block.getFrame(0).remaining());
+		}
+	}
+
+	@Test
+	public void testLaceCountIsUnsigned() {
+		// 200 frames of one byte: the count, 199, does not fit a signed byte.
+		final int frames = 200;
+		final ByteBuffer buf = ByteBuffer.allocate(5 + frames);
+		buf.put((byte) 0x81);
+		buf.putShort((short) 0);
+		buf.put((byte) (0x80 | 0x04)); // keyframe + fixed lacing
+		buf.put((byte) (frames - 1));
+		for (int i = 0; i < frames; i++) {
+			buf.put((byte) i);
+		}
+		buf.flip();
+
+		final Block block = new Block(buf);
+		block.parseBlock();
+
+		Assertions.assertEquals(frames, block.getFrameCount());
+		Assertions.assertEquals((byte) 199, block.getFrame(199).get());
+	}
+
+	@Test
+	public void testLacedBlockInsideALargerBuffer() {
+		// The frames are found from the position of the block, not from the start of the buffer.
+		final ByteBuffer buf = ByteBuffer.allocate(16);
+		buf.position(4);
+		buf.put((byte) 0x81);
+		buf.putShort((short) 0);
+		buf.put((byte) (0x80 | 0x02)); // keyframe + xiph lacing
+		buf.put((byte) 1); // 2 frames
+		buf.put((byte) 2); // first frame: 2 bytes
+		buf.put(new byte[] { 1, 2, 3 });
+		buf.flip();
+		buf.position(4);
+
+		final Block block = new Block(buf);
+		block.parseBlock();
+
+		Assertions.assertEquals(2, block.getFrame(0).remaining());
+		Assertions.assertEquals(1, block.getFrame(1).remaining());
+		Assertions.assertEquals(3, block.getFrame(1).get());
 	}
 
 	@Test
