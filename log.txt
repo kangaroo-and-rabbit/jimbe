@@ -21,3 +21,11 @@
 - Reader reste prévu pour un usage séquentiel : fillLock sérialise seek() et le remplissage de la file, mais readFile() doit se terminer avant tout autre appel.
 - Aucun appel à getReferences(), Cues, Track.fromElement(), minSizeLength ni sous-classe de VoidElement dans les autres projets de ~/dev/perso.
 - Bug existant non traité : la taille de la dernière frame lacée (Xiph et EBML) soustrait headerSize alors que remaining() l'exclut déjà. BlockTest le note comme connu : l'audio lacé perd des octets à la lecture.
+
+2026-11-01 - Dependabot version updates activé
+- Activation faite par l'utilisateur dans les réglages GitHub. Dependabot a ouvert les PR #2 à #9, qui doublonnent la PR #1, fusionnée entre-temps.
+- Le graphe de dépendances a fait apparaître 27 alertes sur develop : 2 logback (corrigées par la mise à jour) et 25 issues de formatter-maven-plugin et maven-checkstyle-plugin, déclarés à tort en dépendances compile.
+- Décision : retirer ces deux entrées des <dependencies>. Les plugins restent dans <build>. slf4j-api est désormais la seule dépendance compile, donc ce retrait s'applique aussi aux consommateurs (karideo, karusic) à leur prochaine montée de version de jimbe.
+- Les échecs "security_update_dependency_not_found" de Dependabot portent sur ces paquets transitifs.
+- Bug existant non traité : mvn checkstyle:check échoue car CheckStyle.xml déclare un module UnusedPrivateField introuvable. La CI ne lance pas Checkstyle.
+- La PR #1 a été fusionnée avant le push de ce retrait : il passe par une PR dédiée.
