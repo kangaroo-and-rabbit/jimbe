@@ -117,8 +117,8 @@ public class Writer {
 		if (this.tracksWritten) {
 			return;
 		}
-		this.tracksWritten = true;
 		this.tracks.writeTracks(this.ioDW);
+		this.tracksWritten = true;
 		this.metaSeek.addIndexedElement(DocTypes.Cluster.getType(), this.ioDW.getFilePointer());
 	}
 
@@ -164,10 +164,6 @@ public class Writer {
 
 	void writeSegmentInfo() {
 		this.segmentInfoElem.update(this.ioDW);
-	}
-
-	void writeTracks() {
-		this.tracks.update(this.ioDW);
 	}
 
 	/**
