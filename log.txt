@@ -46,3 +46,12 @@
 - Reste dans SimpleBlock : les encodeurs de lacing restent faux, mais Writer ne les atteint plus. Les autres restes sont dans docs/upstream-forks.md.
 - Ces correctifs n'arrivent à karideo et karusic qu'avec une version publiée de jimbe.
 - Fichiers de cette session : DateElement, FloatElement, Block, SimpleBlock, Cluster, Tracks, Writer, matroska/Reader, leurs tests, spec.md, docs/upstream-forks.md, tools/check-upstream-forks.py. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
+
+2026-11-01 - Revue avant push de l'audit des forks
+- Correction de l'entrée précédente : les 6 résultats de seek différents n'étaient pas une amélioration. Le seek partait du cue exact et perdait les frames encore dues dans le cluster d'avant, par exemple l'audio à 42004 pour un seek à 42003. Il part maintenant un cue plus tôt.
+- Correction aussi : les encodeurs de lacing ne restent pas faux, ils sont corrigés.
+- Vérifié après correction : 697 seeks sur 17 fichiers et 41 sur le film réel de karideo, tous identiques à l'ancien code. Sur ce film, 1 min 35 avant, moins de 12 s après, lecture complète du fichier comprise. 413 tests, plus 48 de karideo et 6 de karusic.
+- Cluster limité à 128 Ko au lieu de 4 Mo : une ligne oubliée par c2874ae écrasait la limite voulue. Elle est retirée, avec vérification au remux. Les fichiers vidéo seuls ont moins de clusters et donc moins de cues. Sur un fichier avec audio, un cluster peut encore commencer sur une frame audio.
+- SeekHead lu au premier seek et non dans readFile() : il faisait échouer l'ouverture d'un fichier à l'index abîmé. Date vide lue comme l'epoch, date hors plage refusée. FloatElement traite aussi les grandes valeurs négatives. Un échec d'écriture de Tracks n'est plus pris pour une réussite.
+- Remarque non retenue : Cluster.flush() peut perdre un cluster si un appelant direct ignore shouldFlushBefore() ou modifie une frame déjà ajoutée. Writer respecte ce contrat, et une erreur est levée.
+- Remux refait avec la version finale : mêmes paquets et mêmes frames clés qu'à la source sur les 17 fichiers, à part le décalage Opus connu.
