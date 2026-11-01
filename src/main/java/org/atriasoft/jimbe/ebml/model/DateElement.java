@@ -28,7 +28,10 @@ import java.util.Date;
  */
 public class DateElement extends SignedIntegerElement {
 	// const uint64 EbmlDate::UnixEpochDelay = 978307200; // 2001/01/01 00:00:00 UTC
+	/** Seconds between the Unix epoch and the EBML epoch. */
 	public static final long UnixEpochDelay = 978307200; // 2001/01/01 00:00:00 UTC
+	private static final long EBML_EPOCH_MS = UnixEpochDelay * 1000;
+	private static final long NANOS_PER_MS = 1000000;
 	private static final int MIN_SIZE_LENGTH = 8;
 
 	/**
@@ -49,7 +52,7 @@ public class DateElement extends SignedIntegerElement {
 	 * @param value Date to set
 	 */
 	public void setDate(final Date value) {
-		final long val = (value.getTime() - UnixEpochDelay) * 1000000000;
+		final long val = (value.getTime() - EBML_EPOCH_MS) * NANOS_PER_MS;
 		setData(ByteBuffer.wrap(packInt(val, MIN_SIZE_LENGTH)));
 	}
 
@@ -59,13 +62,7 @@ public class DateElement extends SignedIntegerElement {
 	 * @return Date of this element
 	 */
 	public Date getDate() {
-		/*
-		 * Date begin = new Date(0); Date start = new Date(1970, 1, 1, 0, 0, 0); Date end = new Date(2001, 1, 1, 0, 0, 0); long diff0 = begin.getTime();
-		 * long diff1 = start.getTime(); long diff2 = end.getTime(); long diff3 = Date.UTC(2001, 1, 1, 0, 0, 0) - Date.UTC(1970, 1, 1, 0, 0, 0);
-		 */
-		long val = getValue();
-		val = val / 1000000000 + UnixEpochDelay;
-		return new Date(val);
+		return new Date(Math.floorDiv(getValue(), NANOS_PER_MS) + EBML_EPOCH_MS);
 	}
 
 	/**
