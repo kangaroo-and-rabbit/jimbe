@@ -29,3 +29,20 @@
 - Les échecs "security_update_dependency_not_found" de Dependabot portent sur ces paquets transitifs.
 - Bug existant non traité : mvn checkstyle:check échoue car CheckStyle.xml déclare un module UnusedPrivateField introuvable. La CI ne lance pas Checkstyle.
 - La PR #1 a été fusionnée avant le push de ce retrait : il passe par une PR dédiée.
+
+2026-11-01 - Audit des forks de jebml et correctifs d'écriture et de lecture
+- Demande : noter les forks vérifiés avec leur dernier commit pour ne pas refaire l'analyse, appliquer les correctifs et réduire les risques pour karideo.
+- Audit : amont gelé depuis le 2020-02-17, aucun commit manquant. 36 forks, forks de forks compris : 18 n'ont aucun commit propre. Relevé dans docs/upstream-forks.md, contrôle avec tools/check-upstream-forks.py.
+- Le premier relevé ne portait que sur 9 forks : huit branches n'avaient pas été lues (kokorin, rt1shnik, PDApps, bdhandap, etc.). Rien d'utile de plus, hormis les drapeaux d'accessibilité de rt1shnik.
+- Corrigé : date du segment (écrit 2103, lu 1970), FloatElement au-delà de Float.MAX_VALUE, dernière frame lacée, lacing par défaut, timecode de bloc sur 16 bits, Tracks au-delà de 4096 octets.
+- Ajouté : seek par les Cues, avec repli sur le scan depuis le premier cluster.
+- Décisions : UnixEpochDelay reste en secondes, contrairement à la PR #9, car la constante est publique. Tracks est écrit au premier cluster, sans reprendre jitsi b310849 qui déplace les données sans recalculer les index. Un bloc garde une frame, y compris en BlockGroup.
+- Changements de comportement : le lacing par défaut de SimpleBlock passe à NONE. Writer n'écrit plus Tracks à la construction. addTrack() peut lever IllegalStateException après le premier cluster. SimpleBlock.setTimecode() lève IllegalArgumentException hors plage.
+- Vérifié : 402 tests. 17 fichiers (16 de tools/test-videos, un film de 2 h 05 généré) et les 2 fichiers réels présents dans karideo (film de 2 h 17), lus à l'identique avec l'ancien et le nouveau code.
+- Vérifié au remux avec ffprobe : mêmes paquets par piste sur les fichiers de tools/test-videos et le film de 2 h 05 (Vorbis, deux pistes), y compris les trois fichiers qui plantaient. Date correcte. Lacing Xiph, EBML, fixe et 200 frames : tailles identiques à ffprobe, l'ancien code plantait.
+- Seek : 41 points par fichier, 17 fichiers : 2 min 48 avant, 7 s après. 6 résultats sur 697 diffèrent : le nouveau trouve la frame exacte (42003) là où l'ancien s'arrêtait 25 unités avant.
+- Vérifié côté consommateurs avec cette version : 48 tests de karideo et 6 de karusic.
+- Écart déjà présent, non traité : CodecDelay n'est pas conservé au remux, l'Opus se décale de 7 ms.
+- Reste dans SimpleBlock : les encodeurs de lacing restent faux, mais Writer ne les atteint plus. Les autres restes sont dans docs/upstream-forks.md.
+- Ces correctifs n'arrivent à karideo et karusic qu'avec une version publiée de jimbe.
+- Fichiers de cette session : DateElement, FloatElement, Block, SimpleBlock, Cluster, Tracks, Writer, matroska/Reader, leurs tests, spec.md, docs/upstream-forks.md, tools/check-upstream-forks.py. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
