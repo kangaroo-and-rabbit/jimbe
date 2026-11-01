@@ -399,4 +399,58 @@ public class WriterExtendedTest {
 		}
 		Assertions.assertEquals(totalFrames, frameCount);
 	}
+
+	// ========== frames the blocks must keep apart, and timecodes they must keep exact ==========
+
+	private static Track videoTrack() {
+		final Track track = new Track();
+		track.setTrackNo(1);
+		track.setTrackType(TrackType.VIDEO);
+		track.setCodecID("V_VP8");
+		final VideoTrack videoInfo = new VideoTrack();
+		videoInfo.setPixelWidth((short) 320);
+		videoInfo.setPixelHeight((short) 240);
+		track.setVideo(videoInfo);
+		return track;
+	}
+
+	private File writeFrames(final long... timecodes) throws Exception {
+		final File file = File.createTempFile("test-frames", ".mkv");
+		final FileDataWriter out = new FileDataWriter(file.getPath());
+		final Writer writer = new Writer(out);
+		writer.addTrack(videoTrack());
+		for (int i = 0; i < timecodes.length; i++) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(timecodes[i]);
+			frame.setKeyFrame(false);
+			frame.setData(ByteBuffer.wrap(new byte[] { (byte) i, (byte) (i + 1) }));
+			writer.addFrame(frame);
+		}
+		writer.close();
+		out.close();
+		return file;
+	}
+
+	private void assertFramesReadBack(final File file, final long... timecodes) throws Exception {
+		final FileDataSource source = new FileDataSource(file.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		for (int i = 0; i < timecodes.length; i++) {
+			final Frame frame = reader.getNextFrame();
+			Assertions.assertNotNull(frame, "Frame " + i + " is missing");
+			Assertions.assertEquals(timecodes[i], frame.getTimecode(), "Timecode of frame " + i);
+			Assertions.assertEquals(2, frame.getData().remaining(), "Size of frame " + i);
+			Assertions.assertEquals((byte) i, frame.getData().get(), "Content of frame " + i);
+		}
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+		file.delete();
+	}
+
+	@Test
+	public void testFramesOfTheSameTimecodeStaySeparate() throws Exception {
+		final long[] timecodes = { 0, 2000, 2000, 2000, 2000 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
 }

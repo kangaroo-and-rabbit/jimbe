@@ -33,7 +33,7 @@ public class SimpleBlock {
 	private int trackNumber = 0;
 	private short timecode = 0;
 	private boolean keyFrame = true;
-	private LaceMode laceMode = LaceMode.EBML;
+	private LaceMode laceMode = LaceMode.NONE;
 	private boolean invisible = false;
 	private boolean discardable = false;
 	private final List<Frame> frames = new ArrayList<>();
@@ -264,7 +264,11 @@ public class SimpleBlock {
 		}
 		this.totalSize += 4;
 
-		return !isSimpleBlock() || !(this.laceMode.equals(LaceMode.NONE) || this.frames.size() > 8);
+		// Without lacing a block holds one frame: two would be read back as one, glued together.
+		if (this.laceMode == LaceMode.NONE) {
+			return false;
+		}
+		return !isSimpleBlock() || this.frames.size() <= 8;
 	}
 
 	/** Returns the track number that this block belongs to. */

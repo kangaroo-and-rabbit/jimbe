@@ -82,22 +82,12 @@ public class SimpleBlockTest {
 	@Test
 	public void testAddFrameReturnsTrueForSmallFrame() {
 		final SimpleBlock block = new SimpleBlock();
-		final Frame frame = makeFrame(1, 0, new byte[] { 0x01, 0x02 });
-		final boolean canAddMore = block.addFrame(frame);
+		block.setLaceMode(LaceMode.XIPH);
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setData(ByteBuffer.wrap(new byte[100]));
 
-		Assertions.assertTrue(canAddMore, "addFrame should return true for a small single frame");
-	}
-
-	@Test
-	public void testAddFrameWithDurationSetsModeNone() {
-		// When duration is set, isSimpleBlock() is false, so addFrame always returns true
-		final SimpleBlock block = new SimpleBlock();
-		final Frame frame = makeFrame(1, 0, new byte[] { 0x01 });
-		frame.setDuration(100);
-		final boolean canAddMore = block.addFrame(frame);
-
-		Assertions.assertTrue(canAddMore);
-		Assertions.assertEquals(100, block.getDuration());
+		Assertions.assertTrue(block.addFrame(frame), "A laced block should accept more than one small frame");
 	}
 
 	// ========== Getters/setters ==========
@@ -146,7 +136,7 @@ public class SimpleBlockTest {
 	@Test
 	public void testLaceModeDefault() {
 		final SimpleBlock block = new SimpleBlock();
-		Assertions.assertEquals(LaceMode.EBML, block.getLaceMode());
+		Assertions.assertEquals(LaceMode.NONE, block.getLaceMode());
 	}
 
 	@Test
@@ -317,5 +307,28 @@ public class SimpleBlockTest {
 		frame.setTimecode(timecode);
 		frame.setData(ByteBuffer.wrap(data));
 		return frame;
+	}
+
+	// ========== default lacing and block timecode ==========
+
+	@Test
+	public void testNoLacingKeepsOneFramePerBlock() {
+		final SimpleBlock block = new SimpleBlock();
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		Assertions.assertFalse(block.addFrame(frame));
+	}
+
+	@Test
+	public void testNoLacingKeepsOneFramePerBlockGroup() {
+		// A frame with a duration, a subtitle for one: the block is written as a BlockGroup.
+		final SimpleBlock block = new SimpleBlock();
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setDuration(100);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		Assertions.assertFalse(block.addFrame(frame));
+		Assertions.assertEquals(100, block.getDuration());
 	}
 }
