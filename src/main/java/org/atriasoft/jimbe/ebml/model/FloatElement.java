@@ -51,7 +51,7 @@ public class FloatElement extends BinaryElement {
 			buf.flip();
 			setData(buf);
 		} else {
-			final ByteBuffer buf = ByteBuffer.allocate(4);
+			final ByteBuffer buf = ByteBuffer.allocate(8);
 			buf.putDouble(value);
 			buf.flip();
 			setData(buf);
