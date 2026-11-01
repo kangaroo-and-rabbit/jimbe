@@ -154,12 +154,14 @@ public class Element {
 	}
 
 	/**
-	 * Sets the element's data buffer and updates the size accordingly.
+	 * Sets the element's data buffer and updates the size accordingly. The buffer is duplicated:
+	 * the content stays shared, but this element keeps its own position and limit.
 	 *
 	 * @param data the data buffer to set
 	 */
 	public void setData(final ByteBuffer data) {
-		this.data = data;
+		this.data = data.duplicate();
+		this.headersSize = null;
 		this.size = data.remaining();
 	}
 
@@ -227,12 +229,13 @@ public class Element {
 	}
 
 	/**
-	 * Sets the element's type ID from a buffer.
+	 * Sets the element's type ID from a buffer. The buffer is duplicated, so this element keeps
+	 * its own position and limit.
 	 *
 	 * @param type the EBML element ID buffer
 	 */
 	public void setType(final ByteBuffer type) {
-		this.type = type;
+		this.type = type.duplicate();
 	}
 
 	/**

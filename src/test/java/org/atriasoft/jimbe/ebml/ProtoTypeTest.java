@@ -61,4 +61,13 @@ public class ProtoTypeTest {
 		final BinaryElement elem = proto.getInstance();
 		Assertions.assertTrue(elem.isType(TEST_ID_5));
 	}
+
+	@Test
+	public void testReadingTheTypeDoesNotMoveThePrototype() {
+		final ProtoType<BinaryElement> proto = new ProtoType<>(BinaryElement.class, "TestBin_PT6",
+				new byte[] { (byte) 0x1F, (byte) 0xFF, (byte) 0xFE, (byte) 0x06 }, 0);
+		proto.getType().position(4);
+		Assertions.assertEquals(4, proto.getType().remaining());
+		Assertions.assertEquals(4, proto.getInstance().getType().remaining());
+	}
 }

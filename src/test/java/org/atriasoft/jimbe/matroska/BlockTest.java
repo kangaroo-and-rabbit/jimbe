@@ -253,4 +253,13 @@ public class BlockTest {
 		blockMax.parseBlock();
 		Assertions.assertEquals(Short.MAX_VALUE, blockMax.getBlockTimecode());
 	}
+
+	@Test
+	public void testParseBlockLeavesTheCallerBufferUntouched() {
+		final ByteBuffer blockData = buildSimpleBlock(1, (short) 0, true, new byte[] { 0x01, 0x02 });
+		final int position = blockData.position();
+		final Block block = new Block(blockData);
+		block.parseBlock();
+		Assertions.assertEquals(position, blockData.position());
+	}
 }

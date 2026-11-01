@@ -51,13 +51,14 @@ public class Block {
 	private final ByteBuffer data;
 
 	/**
-	 * Constructs a Block from raw binary data.
+	 * Constructs a Block from raw binary data. The buffer is duplicated: parsing shares its content
+	 * but leaves its position untouched.
 	 *
 	 * @param data the raw block data including header and frame payload
 	 */
 	public Block(final ByteBuffer data) {
 		LOG.trace("Block created with data {}, {}", data.limit(), data.position());
-		this.data = data;
+		this.data = data.duplicate();
 	}
 
 	/**
