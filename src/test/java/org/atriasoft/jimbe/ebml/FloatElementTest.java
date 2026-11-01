@@ -70,6 +70,15 @@ public class FloatElementTest {
 	}
 
 	@Test
+	public void testNegativeValueBeyondFloatRangeUsesEightBytes() {
+		final FloatElement elem = new FloatElement();
+		elem.setType(FLOAT_ID_1);
+		elem.setValue(-Double.MAX_VALUE);
+		Assertions.assertEquals(8, elem.getSize());
+		Assertions.assertEquals(-Double.MAX_VALUE, elem.getValue());
+	}
+
+	@Test
 	public void testConstructorWithType() {
 		final FloatElement elem = new FloatElement(FLOAT_ID_3);
 		elem.setValue(48000.0);

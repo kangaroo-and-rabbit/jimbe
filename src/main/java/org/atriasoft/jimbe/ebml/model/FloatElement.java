@@ -42,10 +42,9 @@ public class FloatElement extends BinaryElement {
 	 * Set the float value of this element
 	 *
 	 * @param value Float value to set
-	 * @throws ArithmeticException if the float value is larger than Double.MAX_VALUE
 	 */
 	public void setValue(final double value) {
-		if (value < Float.MAX_VALUE) {
+		if (Math.abs(value) < Float.MAX_VALUE) {
 			final ByteBuffer buf = ByteBuffer.allocate(4);
 			buf.putFloat((float) value);
 			buf.flip();
