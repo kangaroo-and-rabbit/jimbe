@@ -106,7 +106,6 @@ public class Writer {
 		this.cluster = new Cluster();
 		this.cluster.setLimitParameters(CLUSTER_DURATION_LIMIT_MS, CLUSTER_SIZE_LIMIT_BYTES);
 		this.cluster.setMinimumParameters(CLUSTER_MIN_DURATION_MS, CLUSTER_MIN_SIZE_BYTES);
-		this.cluster.setLimitParameters(5000, 128 * 1024);
 	}
 
 	/**

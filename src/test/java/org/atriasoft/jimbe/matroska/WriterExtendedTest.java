@@ -597,4 +597,32 @@ public class WriterExtendedTest {
 		Assertions.assertNull(reader.getNextFrame());
 		source.close();
 	}
+
+	// ========== cluster limits ==========
+
+	@Test
+	public void testClusterReaches512KilobytesBeforeANonKeyFrameEndsIt() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		// 400 kB a second of frames without a key frame: only the 5 s or the 4 MB limit may end a cluster.
+		for (int i = 0; i < 100; i++) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(i * 40L);
+			frame.setKeyFrame(i == 0);
+			frame.setData(ByteBuffer.wrap(new byte[16 * 1024]));
+			writer.addFrame(frame);
+		}
+		writer.close();
+
+		final byte[] bytes = java.nio.file.Files.readAllBytes(this.destination.toPath());
+		int clusters = 0;
+		// Past the SeekHead, which names the cluster ID too.
+		for (int i = 512; i + 3 < bytes.length; i++) {
+			if (bytes[i] == 0x1F && bytes[i + 1] == 0x43 && bytes[i + 2] == (byte) 0xB6 && bytes[i + 3] == 0x75) {
+				clusters++;
+			}
+		}
+		Assertions.assertEquals(1, clusters);
+	}
 }
