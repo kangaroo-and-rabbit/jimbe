@@ -25,8 +25,6 @@ package org.atriasoft.jimbe.ebml.model;
  * unknown elements and as the base class for typed elements (string, integer, float, etc.).
  */
 public class BinaryElement extends Element {
-	private static int minSizeLength = 4;
-
 	/**
 	 * Creates a binary element with the specified type ID.
 	 *
@@ -38,22 +36,4 @@ public class BinaryElement extends Element {
 
 	/** Creates an empty binary element. */
 	public BinaryElement() {}
-
-	/**
-	 * Sets the minimum number of bytes used for EBML size encoding for binary elements.
-	 *
-	 * @param minSize the minimum size length
-	 */
-	public static void setMinSizeLength(final int minSize) {
-		minSizeLength = minSize;
-	}
-
-	/**
-	 * Returns the minimum number of bytes used for EBML size encoding for binary elements.
-	 *
-	 * @return the minimum size length
-	 */
-	public static int getMinSizeLength() {
-		return minSizeLength;
-	}
 }

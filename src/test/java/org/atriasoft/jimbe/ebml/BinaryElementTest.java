@@ -1,6 +1,7 @@
 package org.atriasoft.jimbe.ebml;
 
 import org.atriasoft.jimbe.ebml.model.BinaryElement;
+import org.atriasoft.jimbe.ebml.model.Element;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -8,11 +9,6 @@ import org.junit.jupiter.api.Test;
  * Tests for BinaryElement covering the minSizeLength accessors.
  */
 public class BinaryElementTest {
-
-	@Test
-	public void testDefaultMinSizeLength() {
-		Assertions.assertEquals(4, BinaryElement.getMinSizeLength());
-	}
 
 	@Test
 	public void testSetMinSizeLength() {
@@ -36,5 +32,16 @@ public class BinaryElementTest {
 	public void testDefaultConstructor() {
 		final BinaryElement elem = new BinaryElement();
 		Assertions.assertNotNull(elem);
+	}
+
+	@Test
+	public void testMinSizeLengthIsSharedWithElement() {
+		final int original = Element.getMinSizeLength();
+		try {
+			BinaryElement.setMinSizeLength(8);
+			Assertions.assertEquals(8, Element.getMinSizeLength());
+		} finally {
+			Element.setMinSizeLength(original);
+		}
 	}
 }
