@@ -474,5 +474,17 @@ public final class DocTypes {
 	public static final ProtoType<BinaryElement> TagBinary = new ProtoType<>(BinaryElement.class, "TagBinary",
 			new byte[] { (byte) 0x44, (byte) 0x85 }, 4);
 
+	/**
+	 * Forces the registration of every prototype declared here.
+	 * <p>
+	 * Prototypes register themselves when this class initializes. Code that looks an element up by
+	 * its ID before touching any field of this class calls this first, otherwise the lookup finds
+	 * nothing.
+	 * </p>
+	 */
+	public static void ensureRegistered() {
+		// Calling a static method is what runs the class initializer: there is nothing else to do.
+	}
+
 	private DocTypes() {}
 }
