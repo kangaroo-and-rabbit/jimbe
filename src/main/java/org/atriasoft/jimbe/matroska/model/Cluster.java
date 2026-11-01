@@ -167,25 +167,12 @@ public class Cluster {
 				clusterElem.addChildElement(silentElem);
 			}
 
-			SimpleBlock block = null;
-			boolean forceNew = true;
-			long lastTimecode = 0;
-			int lastTrackNumber = 0;
 			LOG.trace("Timecode for cluster set to {}", this.clusterTimecode);
 			for (final Frame frame : this.frames) {
 				frame.setTimecode(frame.getTimecode() - this.clusterTimecode);
 				LOG.trace("Timecode for frame set to {}", frame.getTimecode());
-				if (forceNew || lastTimecode != frame.getTimecode() || lastTrackNumber != frame.getTrackNo()) {
-					if (block != null) {
-						clusterElem.addChildElement(block.toElement());
-					}
-					block = new SimpleBlock();
-				}
-				lastTimecode = frame.getTimecode();
-				lastTrackNumber = frame.getTrackNo();
-				forceNew = !block.addFrame(frame);
-			}
-			if (block != null) {
+				final SimpleBlock block = new SimpleBlock();
+				block.addFrame(frame);
 				clusterElem.addChildElement(block.toElement());
 			}
 			return clusterElem.writeElement(ioDW);
