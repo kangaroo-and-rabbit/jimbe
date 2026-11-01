@@ -3,10 +3,12 @@ package org.atriasoft.jimbe.matroska;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 
 import org.atriasoft.jimbe.io.DataSource;
 import org.atriasoft.jimbe.io.FileDataSource;
 import org.atriasoft.jimbe.io.FileDataWriter;
+import org.atriasoft.jimbe.matroska.model.AudioTrack;
 import org.atriasoft.jimbe.matroska.model.Frame;
 import org.atriasoft.jimbe.matroska.model.Track;
 import org.atriasoft.jimbe.matroska.model.TrackType;
@@ -310,5 +312,226 @@ public class ReaderSeekTest {
 		final Reader reader = new Reader(nonSeekable);
 		reader.readFile();
 		Assertions.assertThrows(UnsupportedOperationException.class, () -> reader.seek(0));
+	}
+
+	// ========== seeking through the cues ==========
+
+	/** Counts what is read, to tell a seek through the cues from a scan of the whole file. */
+	private static final class CountingSource implements DataSource {
+		private final DataSource source;
+		private long bytesRead = 0;
+
+		private CountingSource(final DataSource source) {
+			this.source = source;
+		}
+
+		@Override
+		public byte readByte() {
+			this.bytesRead++;
+			return this.source.readByte();
+		}
+
+		@Override
+		public int read(final ByteBuffer buff) {
+			final int count = this.source.read(buff);
+			this.bytesRead += count;
+			return count;
+		}
+
+		@Override
+		public long skip(final long offset) {
+			return this.source.skip(offset);
+		}
+
+		@Override
+		public long length() {
+			return this.source.length();
+		}
+
+		@Override
+		public long getFilePointer() {
+			return this.source.getFilePointer();
+		}
+
+		@Override
+		public boolean isSeekable() {
+			return this.source.isSeekable();
+		}
+
+		@Override
+		public long seek(final long pos) {
+			return this.source.seek(pos);
+		}
+	}
+
+	private static final int LONG_FILE_SECONDS = 600;
+	private static final int FRAME_SIZE = 4096;
+
+	/** Ten minutes at 25 key frames a second, several clusters of it, each frame numbered. */
+	private void writeLongFile() {
+		final Writer writer = new Writer(this.ioDW);
+		addVideoTrack(writer);
+		for (int i = 0; i < LONG_FILE_SECONDS * 25; i++) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(i * 40L);
+			final byte[] data = new byte[FRAME_SIZE];
+			ByteBuffer.wrap(data).putInt(i);
+			frame.setData(ByteBuffer.wrap(data));
+			writer.addFrame(frame);
+		}
+		writer.close();
+	}
+
+	private static int numberOf(final Frame frame) {
+		return frame.getData().getInt();
+	}
+
+	private long[] seekPoints() {
+		final long end = LONG_FILE_SECONDS * 1000L;
+		return new long[] { 0, 1, 39, 40, 41, 999, 5000, 123456, 299999, end - 41, end - 40, end - 1, end, end + 5000 };
+	}
+
+	private void assertSeekFindsEveryFrame(final Reader reader) {
+		for (final long target : seekPoints()) {
+			final long expected = Math.min(target / 40, LONG_FILE_SECONDS * 25L - 1);
+			Assertions.assertEquals(expected * 40, reader.seek(target), "Seek to " + target);
+			Assertions.assertEquals((int) expected, numberOf(reader.getNextFrame()), "Frame after seek to " + target);
+			if (expected + 1 < LONG_FILE_SECONDS * 25L) {
+				Assertions.assertEquals((int) expected + 1, numberOf(reader.getNextFrame()),
+						"Second frame after seek to " + target);
+			}
+		}
+	}
+
+	@Test
+	public void testSeekThroughTheCuesFindsEveryFrame() throws IOException {
+		writeLongFile();
+		assertSeekFindsEveryFrame(openReader());
+	}
+
+	@Test
+	public void testSeekThroughTheCuesOnlyReadsTheEndOfTheFile() throws IOException {
+		writeLongFile();
+		final CountingSource source = new CountingSource(new FileDataSource(this.destination.getPath()));
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		reader.getNextFrame();
+
+		final long before = source.bytesRead;
+		Assertions.assertEquals((LONG_FILE_SECONDS - 1) * 1000L, reader.seek((LONG_FILE_SECONDS - 1) * 1000L));
+		final long read = source.bytesRead - before;
+
+		Assertions.assertTrue(read < this.destination.length() / 50,
+				"Read " + read + " bytes of " + this.destination.length());
+	}
+
+	/** Replaces every occurrence of the Cues ID in the SeekHead area, so the file no longer says where they are. */
+	private void hideTheCues() throws IOException {
+		final byte[] bytes = Files.readAllBytes(this.destination.toPath());
+		for (int i = 0; i < 512; i++) {
+			if (bytes[i] == 0x1C && bytes[i + 1] == 0x53 && bytes[i + 2] == (byte) 0xBB && bytes[i + 3] == 0x6B) {
+				bytes[i + 3] = 0x6C;
+			}
+		}
+		Files.write(this.destination.toPath(), bytes);
+	}
+
+	@Test
+	public void testSeekWithoutCuesFindsTheSameFrames() throws IOException {
+		writeLongFile();
+		hideTheCues();
+		assertSeekFindsEveryFrame(openReader());
+	}
+
+	@Test
+	public void testSeekHeadPointingElsewhereFallsBackToTheScan() throws IOException {
+		writeLongFile();
+		final byte[] bytes = Files.readAllBytes(this.destination.toPath());
+		for (int i = bytes.length - 1; i >= 3; i--) {
+			if (bytes[i - 3] == 0x1C && bytes[i - 2] == 0x53 && bytes[i - 1] == (byte) 0xBB && bytes[i] == 0x6B) {
+				bytes[i] = 0x6C; // the Cues element itself, the SeekHead still points at it
+				break;
+			}
+		}
+		Files.write(this.destination.toPath(), bytes);
+		assertSeekFindsEveryFrame(openReader());
+	}
+
+	@Test
+	public void testCueWithoutClusterFallsBackToTheScan() throws IOException {
+		writeLongFile();
+		final byte[] bytes = Files.readAllBytes(this.destination.toPath());
+		// The cues end the file: the last bytes are the position of the last cluster, one byte too far now.
+		int patched = 0;
+		for (int size = 1; size <= 4; size++) {
+			final int id = bytes.length - size - 2;
+			if (bytes[id] == (byte) 0xF1 && bytes[id + 1] == (byte) (0x80 | size)) {
+				bytes[bytes.length - 1]++;
+				patched++;
+			}
+		}
+		Assertions.assertEquals(1, patched, "The last cluster position should end the file");
+		Files.write(this.destination.toPath(), bytes);
+		assertSeekFindsEveryFrame(openReader());
+	}
+
+	@Test
+	public void testClustersOutOfOrderIgnoreTheCues() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		addVideoTrack(writer);
+		final long[] timecodes = { 3600000, 3600040, 0, 40 };
+		for (final long timecode : timecodes) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(timecode);
+			frame.setKeyFrame(false);
+			frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+			writer.addFrame(frame);
+		}
+		writer.close();
+
+		final Reader reader = openReader();
+		// Read from the start like the file is laid out: the frame found is the one before the first that is too late.
+		Assertions.assertEquals(3600000, reader.seek(3600010));
+		Assertions.assertEquals(3600000, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(3600040, reader.getNextFrame().getTimecode());
+	}
+
+	@Test
+	public void testFrameNamedByTheCueDoesNotComeFirstInItsCluster() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		addVideoTrack(writer);
+		final Track audio = new Track();
+		audio.setTrackNo(2);
+		audio.setTrackType(TrackType.AUDIO);
+		audio.setCodecID("A_OPUS");
+		final AudioTrack audioInfo = new AudioTrack();
+		audioInfo.setChannels((short) 2);
+		audioInfo.setSamplingFrequency(48000);
+		audio.setAudio(audioInfo);
+		writer.addTrack(audio);
+		// The audio at 1001 opens the second cluster; the video at 1000 sets its timecode, and so the cue.
+		writer.addFrame(seekFrame(1, 0, true));
+		writer.addFrame(seekFrame(1, 900, false));
+		writer.addFrame(seekFrame(2, 1001, true));
+		writer.addFrame(seekFrame(1, 1000, true));
+		writer.addFrame(seekFrame(1, 1040, false));
+		writer.close();
+
+		final Reader reader = openReader();
+		Assertions.assertEquals(900, reader.seek(1000));
+		Assertions.assertEquals(900, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(1001, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(1000, reader.getNextFrame().getTimecode());
+	}
+
+	private static Frame seekFrame(final int trackNo, final long timecode, final boolean keyFrame) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(trackNo);
+		frame.setTimecode(timecode);
+		frame.setKeyFrame(keyFrame);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		return frame;
 	}
 }
