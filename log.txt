@@ -64,3 +64,10 @@
 - Remarque levée : les sous-titres gardent bien leur durée au remux, SimpleBlock.addFrame() la reprend.
 - Limite connue : Track ne lit que quatre éléments de Video, donc Colour se perd au remux.
 - Fichiers de cette session : Track, Frame, SimpleBlock, Cluster, Cues, Writer, matroska/Reader, leurs tests, spec.md. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
+
+2026-11-02 - Revue avant push des cues et du timing Opus
+- Corrigé : un BlockGroup sans BlockDuration se lisait avec une durée 0, réécrite ensuite comme une vraie durée. Il se lit maintenant avec Long.MIN_VALUE, ce qui change Frame.getDuration() pour ce cas.
+- Corrigé : avec deux pistes vidéo aux GOP décalés, le cue nommait aussi celle dont la frame clé venait plus tard. Il ne nomme plus que les pistes qui en ont une à son timecode.
+- Corrigé : une piste vidéo sans frames, comme une pochette, privait l'audio de cues. Un cluster sans frame vidéo prend de nouveau un cue.
+- Corrigé : un DiscardPadding négatif d'un bloc lacé va sur la première frame, un DiscardPadding vide se lit 0 au lieu de planter, et une frame avec padding ferme un bloc lacé.
+- Non retenu : Cues reste écrit vide dans un fichier vidéo sans frame clé. Le schéma veut un CuePoint, mais karideo lit le SeekHead pour juger l'index, et ce cas ne vient que d'un appelant qui ne marque pas ses frames clés.
