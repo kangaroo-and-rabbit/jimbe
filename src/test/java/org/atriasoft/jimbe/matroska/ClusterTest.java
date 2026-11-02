@@ -449,6 +449,38 @@ public class ClusterTest {
 		Assertions.assertTrue(cluster.shouldFlushBefore(frameOf(VIDEO, 80, true)));
 	}
 
+	/** Two video tracks whose key frames do not line up: the cue can only speak of the one at its timecode. */
+	@Test
+	public void testCueDoesNotNameATrackWhoseKeyFrameComesLater() {
+		final int otherVideo = 3;
+		final Cluster cluster = clusterWithVideo();
+		cluster.addVideoTrack(otherVideo);
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		cluster.addFrame(frameOf(otherVideo, 0, false));
+		cluster.addFrame(frameOf(otherVideo, 300, true));
+		Assertions.assertEquals(0, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(VIDEO), cluster.getCueTracks());
+	}
+
+	@Test
+	public void testCueNamesEveryVideoTrackWithAKeyFrameAtItsTimecode() {
+		final int otherVideo = 3;
+		final Cluster cluster = clusterWithVideo();
+		cluster.addVideoTrack(otherVideo);
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		cluster.addFrame(frameOf(otherVideo, 0, true));
+		Assertions.assertEquals(2, cluster.getCueTracks().size());
+	}
+
+	/** A short video track, or a cover, must not leave the rest of the audio without an index. */
+	@Test
+	public void testClusterWithoutAnyVideoFrameTakesACueOnItsOtherTracks() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(AUDIO, 100, true));
+		Assertions.assertEquals(100, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(AUDIO), cluster.getCueTracks());
+	}
+
 	@Test
 	public void testWithoutVideoACueNamesTheCluster() {
 		final Cluster cluster = new Cluster();

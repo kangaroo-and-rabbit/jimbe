@@ -46,7 +46,7 @@ public class Cluster {
 	/** The video tracks of the file. As long as there are none, any track can be jumped to anywhere. */
 	private final Set<Integer> videoTracks = new HashSet<>();
 
-	/** The video tracks with a key frame in this cluster. */
+	/** The video tracks with a key frame at {@link #videoKeyFrameTimecode}, the only ones a cue can name. */
 	private final Set<Integer> videoKeyFrameTracks = new HashSet<>();
 
 	/** The first video key frame of this cluster. */
@@ -166,8 +166,13 @@ public class Cluster {
 		this.totalSize += frame.getData().remaining();
 		this.tracks.add(frame.getTrackNo());
 		if (frame.isKeyFrame() && this.videoTracks.contains(frame.getTrackNo())) {
-			this.videoKeyFrameTracks.add(frame.getTrackNo());
-			this.videoKeyFrameTimecode = Math.min(this.videoKeyFrameTimecode, frame.getTimecode());
+			if (frame.getTimecode() < this.videoKeyFrameTimecode) {
+				this.videoKeyFrameTracks.clear();
+				this.videoKeyFrameTimecode = frame.getTimecode();
+			}
+			if (frame.getTimecode() == this.videoKeyFrameTimecode) {
+				this.videoKeyFrameTracks.add(frame.getTrackNo());
+			}
 		}
 		return ((frame.getTimecode() - this.clusterTimecode) < this.durationLimit) && (this.totalSize < this.sizeLimit);
 	}
@@ -229,23 +234,29 @@ public class Cluster {
 		return Collections.unmodifiableSet(this.tracks);
 	}
 
+	/** Without a picture in the cluster, what is in it can be started from anywhere. */
+	private boolean holdsVideo() {
+		return !Collections.disjoint(this.tracks, this.videoTracks);
+	}
+
 	/**
-	 * Returns the timecode a cue of this cluster gives: its first video key frame, or its start without video.
+	 * Returns the timecode a cue of this cluster gives: its first video key frame, or its start if it holds no
+	 * video.
 	 *
 	 * @return the timecode of the cue
 	 */
 	public long getCueTimecode() {
-		return this.videoTracks.isEmpty() ? this.clusterTimecode : this.videoKeyFrameTimecode;
+		return holdsVideo() ? this.videoKeyFrameTimecode : this.clusterTimecode;
 	}
 
 	/**
-	 * Returns the tracks a cue of this cluster names. A cluster that holds no video key frame in a file with
-	 * video has none: a cue on it would send a player to a picture it can not decode.
+	 * Returns the tracks a cue of this cluster names. A cluster with video but no key frame has none: a cue on
+	 * it would send a player to a picture it can not decode.
 	 *
 	 * @return a read-only view of the track numbers, empty if this cluster takes no cue
 	 */
 	public Collection<Integer> getCueTracks() {
-		return Collections.unmodifiableSet(this.videoTracks.isEmpty() ? this.tracks : this.videoKeyFrameTracks);
+		return Collections.unmodifiableSet(holdsVideo() ? this.videoKeyFrameTracks : this.tracks);
 	}
 
 	/**
