@@ -68,6 +68,36 @@ public class ReaderRoundTripTest {
 	}
 
 	@Test
+	public void testCodecDelayAndSeekPreRollRoundTrip() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		final Track track = new Track();
+		track.setTrackNo(1);
+		track.setTrackType(TrackType.AUDIO);
+		track.setCodecID("A_OPUS");
+		track.setAudio(new AudioTrack());
+		// What libopus asks for at 48 kHz, and the 80 ms the Opus mapping of Matroska recommends.
+		track.setCodecDelay(6500000L);
+		track.setSeekPreroll(80000000L);
+		writer.addTrack(track);
+		writer.close();
+
+		final Track read = openReader().getTrackList()[0];
+		Assertions.assertEquals(6500000L, read.getCodecDelay());
+		Assertions.assertEquals(80000000L, read.getSeekPreroll());
+	}
+
+	@Test
+	public void testCodecDelayAndSeekPreRollDefaultToNothing() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		addDummyTrackAndFrame(writer);
+		writer.close();
+
+		final Track read = openReader().getTrackList()[0];
+		Assertions.assertEquals(0, read.getCodecDelay());
+		Assertions.assertEquals(0, read.getSeekPreroll());
+	}
+
+	@Test
 	public void testDurationRoundTrip() throws IOException {
 		final Writer writer = new Writer(this.ioDW);
 		writer.setDuration(5000.0); // 5 seconds in ms
