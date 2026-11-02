@@ -55,3 +55,12 @@
 - SeekHead lu au premier seek et non dans readFile() : il faisait échouer l'ouverture d'un fichier à l'index abîmé. Date vide lue comme l'epoch, date hors plage refusée. FloatElement traite aussi les grandes valeurs négatives. Un échec d'écriture de Tracks n'est plus pris pour une réussite.
 - Remarque non retenue : Cluster.flush() peut perdre un cluster si un appelant direct ignore shouldFlushBefore() ou modifie une frame déjà ajoutée. Writer respecte ce contrat, et une erreur est levée.
 - Remux refait avec la version finale : mêmes paquets et mêmes frames clés qu'à la source sur les 17 fichiers, à part le décalage Opus connu.
+
+2026-11-02 - Correction des restes de l'audit
+- Cues : dans un fichier avec vidéo, chaque cluster prend au plus un cue, sur sa première frame clé vidéo. L'audio ne ferme plus de cluster, et un cluster sans frame clé vidéo n'a plus de cue. Une frame clé vidéo ferme aussitôt un cluster qui n'en a pas, pour commencer le suivant.
+- Vérifié avec ffmpeg : image décodée après 9 sauts par fichier, comparée à la source. Avant : fausse sur 7 sauts sur 9 d'un film à longs GOP, 8 sur 9 sur vp9_var_1audio et av1_var_2audio, 5 sur 9 sur le film réel de karideo. Après : identique partout.
+- CodecDelay et SeekPreRoll sont lus et réécrits : le décalage Opus de 7 ms au remux disparaît. seekPreroll passe de int à long, comme l'élément.
+- DiscardPadding était perdu aussi, ce que le contrôle ffprobe ne montrait pas avant d'avoir comparé les paquets un à un. Il passe par Frame.
+- Remarque levée : les sous-titres gardent bien leur durée au remux, SimpleBlock.addFrame() la reprend.
+- Limite connue : Track ne lit que quatre éléments de Video, donc Colour se perd au remux.
+- Fichiers de cette session : Track, Frame, SimpleBlock, Cluster, Cues, Writer, matroska/Reader, leurs tests, spec.md. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
