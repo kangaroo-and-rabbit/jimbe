@@ -66,7 +66,6 @@ Ces deux bugs de jimbe n'étaient corrigés par aucun fork et l'ont été ici :
 
 Rien de bloquant. À reprendre seulement si un besoin apparaît :
 
-- CodecDelay n'est pas conservé au remux : l'Opus se décale de 7 ms, sans perte de donnée. L'écriture de SeekPreRoll manque aussi.
 - Les frames d'un bloc lacé gardent toutes le timecode du bloc à la lecture, sans étalement par DefaultDuration.
 - Colour perdu au remux : ajouter l'élément 0x55B0 et le recopier. Sans effet si le flux porte aussi ces informations.
 - dstukalov `58bba67` : canal alpha.
