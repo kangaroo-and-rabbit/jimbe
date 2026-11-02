@@ -20,7 +20,9 @@ What a release does, in order:
   6. bring 'develop' back on top of it and open the next '-dev' version.
 
 Nothing is pushed: 'deliver push' does that, and 'deliver revert' undoes a
-release that has not been pushed yet.
+release that has not been pushed yet. 'deliver deploy' runs 'mvn deploy' on the
+prepared release, and 'deliver --deploy' chains everything: release, deploy,
+then push -- only once the deploy succeeded.
 
 @author Edouard DUPIN
 @license MPL v2.0
@@ -30,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -38,6 +41,8 @@ from pathlib import Path
 RELEASE_SCRIPT = ".island/release.bash"
 VERSION_FILE = "version.txt"
 STATE_FILE = "deliver-state.json"
+BUILD_FILE = "pom.xml"
+DEPLOY_COMMAND = ("mvn", "deploy")
 RELEASE_MESSAGE = "[RELEASE] Release v{version}"
 DEVELOP_MESSAGE = "[VERSION] update dev tag version"
 TAG_MESSAGE = "[TAG] create tag {tag}"
@@ -296,6 +301,16 @@ class Repository:
 			raise DeliverError(f"'{RELEASE_SCRIPT}' failed with code {result.returncode}")
 		return True
 
+	def run_deploy(self) -> None:
+		"""Run 'mvn deploy' on the checked-out tree, its output going straight to the terminal."""
+		command = " ".join(DEPLOY_COMMAND)
+		Out.step(command)
+		# Maven writes straight to the terminal: flush first, or it would overtake our own lines.
+		sys.stdout.flush()
+		result = subprocess.run(list(DEPLOY_COMMAND), cwd=self.root)
+		if result.returncode != 0:
+			raise DeliverError(f"'{command}' failed with code {result.returncode}")
+
 	def load_state(self) -> dict:
 		if not self.state_path.exists():
 			raise DeliverError("No release to work on: no state file (nothing was delivered from here)")
@@ -335,6 +350,14 @@ def check_ready(repo: Repository) -> None:
 		for sha, subject, _ in ahead:
 			Out.info(f"{sha}  {subject}")
 		raise DeliverError(f"Merge '{repo.main}' back into '{repo.develop}' before releasing")
+
+
+def check_deployable(repo: Repository) -> None:
+	"""What 'mvn deploy' needs, checked before anything is touched."""
+	if not (repo.root / BUILD_FILE).exists():
+		raise DeliverError(f"Nothing to deploy: no '{BUILD_FILE}' at the repository root")
+	if shutil.which(DEPLOY_COMMAND[0]) is None:
+		raise DeliverError(f"'{DEPLOY_COMMAND[0]}' is not in the PATH")
 
 
 def warn_on_remote_drift(repo: Repository) -> None:
@@ -391,6 +414,11 @@ def ask_level(current: Version) -> str:
 
 def command_release(repo: Repository, args: argparse.Namespace) -> int:
 	check_ready(repo)
+	if args.deploy:
+		# Fail now rather than after the release commits are made.
+		check_deployable(repo)
+		if not repo.git.remote_exists(repo.remote):
+			raise DeliverError(f"Unknown remote '{repo.remote}': --deploy would have nowhere to push")
 	warn_on_remote_drift(repo)
 	if show_commits_since_last_release(repo) == 0 and not args.force:
 		raise DeliverError(
@@ -412,6 +440,9 @@ def command_release(repo: Repository, args: argparse.Namespace) -> int:
 		Out.info(f"commit  '{RELEASE_MESSAGE.format(version=release_version)}'")
 		Out.info(f"tag     '{tag_name}'")
 		Out.info(f"commit  '{DEVELOP_MESSAGE}' on '{repo.develop}' ({next_version})")
+		if args.deploy:
+			Out.info(f"{' '.join(DEPLOY_COMMAND)} on '{repo.main}'")
+			Out.info(f"push    '{repo.main}', '{repo.develop}' and the tags to '{repo.remote}' if the deploy succeeds")
 		Out.warn("dry-run: nothing was modified")
 		return 0
 
@@ -460,7 +491,69 @@ def command_release(repo: Repository, args: argparse.Namespace) -> int:
 	Out.title(f"Released {tag_name}")
 	Out.info(f"{repo.main}    {state['main_after'][:9]}")
 	Out.info(f"{repo.develop} {state['develop_after'][:9]}  ({next_version})")
-	Out.info("Nothing is pushed yet: './deliver push' to publish, './deliver revert' to undo")
+	if not args.deploy:
+		Out.info("Nothing is pushed yet: './deliver push' to publish, './deliver revert' to undo")
+		return 0
+
+	# 5. deploy, and push only once the artifacts are out: a pushed tag with nothing deployed
+	#    behind it would announce a version nobody can use.
+	Out.title(f"Deploy {tag_name}")
+	try:
+		deploy_release(repo, state)
+	except DeliverError as error:
+		raise DeliverError(
+			f"{error}\n"
+			f"    {tag_name} is released locally, neither deployed nor pushed:\n"
+			f"    './deliver deploy' to try again, './deliver revert' to undo the release"
+		) from error
+	return command_push(repo, args)
+
+
+# ---------------------------------------------------------------------------
+# deploy
+# ---------------------------------------------------------------------------
+
+def deploy_release(repo: Repository, state: dict) -> None:
+	"""Deploy the prepared release, built from the release commit, and record it in the state."""
+	main = state["main_branch"]
+	if repo.git.rev(main) != state["main_after"]:
+		raise DeliverError(
+			f"'{main}' moved since the release ({repo.git.rev(main)[:9]} != {state['main_after'][:9]}):"
+			f" it is no longer the code of {state['tag']}"
+		)
+	# Built from the release commit, then back on the branch it was called from.
+	current = repo.git.current_branch()
+	if current != main:
+		repo.git.checkout(main)
+	try:
+		repo.run_deploy()
+	finally:
+		if current != main:
+			repo.git.checkout(current)
+	state["deployed_at"] = datetime.now(timezone.utc).isoformat()
+	repo.save_state(state)
+
+
+def command_deploy(repo: Repository, args: argparse.Namespace) -> int:
+	if not repo.state_path.exists():
+		raise DeliverError("Nothing to deploy: no release was prepared from here (run './deliver' first)")
+	state = repo.load_state()
+	if not repo.git.is_clean():
+		raise DeliverError("The working tree is not clean: commit or stash first")
+	check_deployable(repo)
+	if "deployed_at" in state and not args.force:
+		raise DeliverError(
+			f"{state['tag']} is already deployed, and a Maven repository refuses a release twice.\n"
+			f"    Publish it with './deliver push'; --force to deploy it again anyway"
+		)
+	Out.title(f"Deploy {state['tag']}")
+	if args.dry_run:
+		Out.info(f"{' '.join(DEPLOY_COMMAND)} on '{state['main_branch']}'")
+		Out.warn("dry-run: nothing was deployed")
+		return 0
+	deploy_release(repo, state)
+	Out.title(f"Deployed {state['tag']}")
+	Out.info("Not pushed yet: './deliver push' to publish")
 	return 0
 
 
@@ -520,6 +613,14 @@ def command_revert(repo: Repository, args: argparse.Namespace) -> int:
 
 	if not repo.git.is_clean():
 		raise DeliverError("The working tree is not clean: commit or stash first")
+
+	# Deployed artifacts cannot be taken back: the next release would reuse a version number
+	# the Maven repository already holds.
+	if "deployed_at" in state and not args.force:
+		raise DeliverError(
+			f"{tag_name} is already deployed: its version number is spent.\n"
+			f"    Publish it with './deliver push' and release a fix instead (--force to revert anyway)"
+		)
 
 	# The branches must still be where the release left them, otherwise the recorded
 	# 'before' revisions would throw away work done since.
@@ -584,7 +685,10 @@ def command_status(repo: Repository, _args: argparse.Namespace) -> int:
 	Out.info(f"working tree  {'clean' if repo.git.is_clean() else 'DIRTY'}")
 	if repo.state_path.exists():
 		state = repo.load_state()
-		Out.warn(f"release {state['tag']} prepared and not pushed ('deliver push' or 'deliver revert')")
+		if "deployed_at" in state:
+			Out.warn(f"release {state['tag']} deployed and not pushed ('deliver push')")
+		else:
+			Out.warn(f"release {state['tag']} prepared and not pushed ('deliver push' or 'deliver revert')")
 	else:
 		revision_range = f"{last_tag}..{repo.develop}" if last_tag else repo.develop
 		pending = [entry for entry in repo.git.log(revision_range) if not entry[1].startswith(PLUMBING_MESSAGES)]
@@ -613,16 +717,21 @@ def build_parser() -> argparse.ArgumentParser:
 		help="release: skip the interactive question and bump this part of the version",
 	)
 	parser.add_argument(
+		"--deploy",
+		action="store_true",
+		help="release: then run 'mvn deploy' on the release and, only if it succeeds, push",
+	)
+	parser.add_argument(
 		"--force",
 		action="store_true",
-		help="release: release even with nothing new; revert: revert even if the branches moved "
-		"or the tag is published",
+		help="release: release even with nothing new; deploy: deploy again; revert: revert even if "
+		"the branches moved, the tag is published or the release is deployed",
 	)
 	parser.add_argument(
 		"command",
 		nargs="?",
 		default="release",
-		choices=("release", "push", "revert", "status"),
+		choices=("release", "deploy", "push", "revert", "status"),
 		help="what to do (default: release)",
 	)
 	return parser
@@ -633,6 +742,7 @@ def main(argv: list) -> int:
 
 	commands = {
 		"release": command_release,
+		"deploy": command_deploy,
 		"push": command_push,
 		"revert": command_revert,
 		"status": command_status,
