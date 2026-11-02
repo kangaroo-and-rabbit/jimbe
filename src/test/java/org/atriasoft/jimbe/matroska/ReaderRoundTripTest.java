@@ -97,6 +97,63 @@ public class ReaderRoundTripTest {
 		Assertions.assertEquals(0, read.getSeekPreroll());
 	}
 
+	private static Frame audioFrame(final long timecode) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setTimecode(timecode);
+		frame.setKeyFrame(true);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
+		return frame;
+	}
+
+	private void writeOpusFrames(final Frame... frames) {
+		final Writer writer = new Writer(this.ioDW);
+		final Track track = new Track();
+		track.setTrackNo(1);
+		track.setTrackType(TrackType.AUDIO);
+		track.setCodecID("A_OPUS");
+		track.setAudio(new AudioTrack());
+		writer.addTrack(track);
+		for (final Frame frame : frames) {
+			writer.addFrame(frame);
+		}
+		writer.close();
+	}
+
+	@Test
+	public void testDiscardPaddingRoundTrip() throws IOException {
+		final Frame last = audioFrame(20);
+		last.setDuration(7);
+		last.setDiscardPadding(13500000L);
+		writeOpusFrames(audioFrame(0), last);
+
+		final Reader reader = openReader();
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
+		final Frame read = reader.getNextFrame();
+		Assertions.assertEquals(13500000L, read.getDiscardPadding());
+		Assertions.assertEquals(7, read.getDuration());
+		Assertions.assertTrue(read.isKeyFrame());
+	}
+
+	@Test
+	public void testNegativeDiscardPaddingRoundTrip() throws IOException {
+		final Frame frame = audioFrame(0);
+		frame.setDiscardPadding(-2500000L);
+		writeOpusFrames(frame);
+
+		Assertions.assertEquals(-2500000L, openReader().getNextFrame().getDiscardPadding());
+	}
+
+	@Test
+	public void testDiscardPaddingWithoutDurationWritesNoDuration() throws IOException {
+		final Frame frame = audioFrame(0);
+		frame.setDiscardPadding(1000000L);
+		writeOpusFrames(frame);
+
+		// A BlockGroup that says nothing of its duration reads back as 0, not as what was never set.
+		Assertions.assertEquals(0, openReader().getNextFrame().getDuration());
+	}
+
 	@Test
 	public void testDurationRoundTrip() throws IOException {
 		final Writer writer = new Writer(this.ioDW);

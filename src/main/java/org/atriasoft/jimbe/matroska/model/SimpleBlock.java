@@ -44,6 +44,9 @@ public class SimpleBlock {
 
 	private long duration = Long.MIN_VALUE;
 
+	/** What a decoder drops from the end of this block in nanoseconds, or 0 if nothing. */
+	private long discardPadding = 0;
+
 	/** Constructs an empty SimpleBlock with default settings. */
 	public SimpleBlock() {
 
@@ -51,7 +54,7 @@ public class SimpleBlock {
 
 	/**
 	 * Converts this block to the appropriate EBML element.
-	 * Returns a SimpleBlock element if no duration is set, otherwise a BlockGroup.
+	 * Returns a SimpleBlock element if it has nothing else to carry, otherwise a BlockGroup.
 	 *
 	 * @return the EBML {@link Element} representing this block
 	 */
@@ -74,7 +77,7 @@ public class SimpleBlock {
 	}
 
 	/**
-	 * Creates a BlockGroup EBML element containing the block data and its duration.
+	 * Creates a BlockGroup EBML element containing the block data, its duration and its padding.
 	 *
 	 * @return a {@link MasterElement} representing the BlockGroup
 	 */
@@ -82,10 +85,17 @@ public class SimpleBlock {
 		final MasterElement blockGroupElem = DocTypes.BlockGroup.getInstance();
 		final BinaryElement blockElem = DocTypes.Block.getInstance();
 		blockElem.setData(createInnerData());
-		final UnsignedIntegerElement durationElem = DocTypes.BlockDuration.getInstance();
-		durationElem.setValue(this.duration);
 		blockGroupElem.addChildElement(blockElem);
-		blockGroupElem.addChildElement(durationElem);
+		if (this.duration != Long.MIN_VALUE) {
+			final UnsignedIntegerElement durationElem = DocTypes.BlockDuration.getInstance();
+			durationElem.setValue(this.duration);
+			blockGroupElem.addChildElement(durationElem);
+		}
+		if (this.discardPadding != 0) {
+			final SignedIntegerElement paddingElem = DocTypes.DiscardPadding.getInstance();
+			paddingElem.setValue(this.discardPadding);
+			blockGroupElem.addChildElement(paddingElem);
+		}
 		if (!this.keyFrame) {
 			final SignedIntegerElement refElem = DocTypes.ReferenceBlock.getInstance();
 			refElem.setValue(0);
@@ -287,6 +297,9 @@ public class SimpleBlock {
 		if (frame.getDuration() != Long.MIN_VALUE) {
 			this.duration = frame.getDuration();
 		}
+		if (frame.getDiscardPadding() != 0) {
+			this.discardPadding = frame.getDiscardPadding();
+		}
 
 		if (frame.getData().remaining() > MAX_LACE_SIZE) {
 			// A block already holding frames stays laced: without the sizes they could not be told apart.
@@ -335,10 +348,10 @@ public class SimpleBlock {
 	}
 
 	/**
-	 * Returns {@code true} if this block should be written as a SimpleBlock (no duration set).
-	 * When a duration is present, it must be written as a BlockGroup instead.
+	 * Returns {@code true} if this block should be written as a SimpleBlock (no duration or padding set).
+	 * When either is present, it must be written as a BlockGroup instead.
 	 */
 	public boolean isSimpleBlock() {
-		return this.duration == Long.MIN_VALUE;
+		return this.duration == Long.MIN_VALUE && this.discardPadding == 0;
 	}
 }

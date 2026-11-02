@@ -498,6 +498,15 @@ public class BlockGroupTest {
 			final short timecode,
 			final byte[][] frames,
 			final long duration) {
+		return buildLacedBlockGroup(trackNo, timecode, frames, duration, 0);
+	}
+
+	private byte[] buildLacedBlockGroup(
+			final int trackNo,
+			final short timecode,
+			final byte[][] frames,
+			final long duration,
+			final long discardPadding) {
 		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
 
 		// Block (0xA1) with fixed-size lacing
@@ -506,6 +515,11 @@ public class BlockGroupTest {
 
 		// BlockDuration (0x9B)
 		writeRawElement(inner, new byte[] { (byte) 0x9B }, encodeUnsignedInt(duration));
+
+		if (discardPadding != 0) {
+			// DiscardPadding (0x75A2)
+			writeRawElement(inner, new byte[] { 0x75, (byte) 0xA2 }, encodeUnsignedInt(discardPadding));
+		}
 
 		// Wrap in BlockGroup (0xA0)
 		final ByteArrayOutputStream bg = new ByteArrayOutputStream();
@@ -573,6 +587,26 @@ public class BlockGroupTest {
 		final Frame thirdFrame = reader.getNextFrame();
 		Assertions.assertNotNull(thirdFrame, "Third laced BlockGroup frame should not be null");
 		Assertions.assertEquals(3, thirdFrame.getData().remaining());
+	}
+
+	/**
+	 * The padding comes off the end of the block: spread over its frames, it would cut each of them once they
+	 * are written as a block of their own.
+	 */
+	@Test
+	public void testLacedBlockGroupKeepsThePaddingOnItsLastFrame() throws IOException {
+		writeBaseMkv();
+
+		final byte[][] frameData = { { 0x11, 0x22, 0x33 }, { 0x44, 0x55, 0x66 }, { 0x77, (byte) 0x88, (byte) 0x99 } };
+		replaceCluster(buildCluster(0, buildLacedBlockGroup(1, (short) 0, frameData, 100, 5000000)));
+
+		final FileDataSource inputDataSource = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(inputDataSource);
+		reader.readFile();
+
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
+		Assertions.assertEquals(5000000, reader.getNextFrame().getDiscardPadding());
 	}
 
 	/**

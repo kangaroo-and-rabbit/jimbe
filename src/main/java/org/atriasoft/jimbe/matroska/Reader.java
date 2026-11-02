@@ -517,6 +517,7 @@ public class Reader {
 
 			} else if (level2.isType(DocTypes.BlockGroup.getType())) {
 				long blockDuration = 0;
+				long discardPadding = 0;
 				boolean hasReference = false;
 				final ArrayList<Long> references = new ArrayList<>();
 				level3 = ((MasterElement) level2).readNextChild(this.reader);
@@ -530,6 +531,10 @@ public class Reader {
 					} else if (level3.isType(DocTypes.BlockDuration.getType())) {
 						level3.readData(this.ioDS);
 						blockDuration = ((UnsignedIntegerElement) level3).getValue();
+
+					} else if (level3.isType(DocTypes.DiscardPadding.getType())) {
+						level3.readData(this.ioDS);
+						discardPadding = ((SignedIntegerElement) level3).getValue();
 
 					} else if (level3.isType(DocTypes.ReferenceBlock.getType())) {
 						level3.readData(this.ioDS);
@@ -555,11 +560,14 @@ public class Reader {
 					frame.addReferences(ref);
 				}
 				frame.setData(block.getFrame(0));
+				// The padding comes off the end of the block: that is its last frame.
+				frame.setDiscardPadding(block.getFrameCount() == 1 ? discardPadding : 0);
 				this.frameQueue.add(new Frame(frame));
 
 				if (block.getFrameCount() > 1) {
 					for (int f = 1; f < block.getFrameCount(); f++) {
 						frame.setData(block.getFrame(f));
+						frame.setDiscardPadding(f == block.getFrameCount() - 1 ? discardPadding : 0);
 						/*
 						 * if (badMP3Headers()) { throw new RuntimeException("Bad Data!"); }
 						 */

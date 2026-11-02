@@ -39,6 +39,8 @@ public class Frame {
 	private long timecode;
 	/** The duration of this frame in milliseconds, or {@link Long#MIN_VALUE} if unset. */
 	private long duration = Long.MIN_VALUE;
+	/** What a decoder drops from the end of this frame in nanoseconds, or 0 if nothing. */
+	private long discardPadding = 0;
 
 	/** List of timecode references to other frames (for non-keyframe dependencies). */
 	private ArrayList<Long> references = new ArrayList<>();
@@ -60,6 +62,7 @@ public class Frame {
 		this.trackNo = copy.trackNo;
 		setTimecode(copy.getTimecode());
 		setDuration(copy.getDuration());
+		setDiscardPadding(copy.getDiscardPadding());
 		setKeyFrame(copy.isKeyFrame());
 		this.references.addAll(copy.references);
 		if (copy.data != null) {
@@ -137,6 +140,21 @@ public class Frame {
 	 */
 	public void setDuration(final long duration) {
 		this.duration = duration;
+	}
+
+	/** Returns what a decoder drops from the end of this frame in nanoseconds, 0 if nothing. */
+	public long getDiscardPadding() {
+		return this.discardPadding;
+	}
+
+	/**
+	 * Sets what a decoder drops from the end of this frame: the last one of an Opus stream rarely ends on a
+	 * whole number of frames. Written as a BlockGroup.
+	 *
+	 * @param discardPadding the padding in nanoseconds
+	 */
+	public void setDiscardPadding(final long discardPadding) {
+		this.discardPadding = discardPadding;
 	}
 
 	/** Returns a duplicate of the data buffer contained in this frame. */
