@@ -19,9 +19,11 @@
  */
 package org.atriasoft.jimbe.matroska;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -75,7 +77,23 @@ public class Reader {
 	private final Queue<Frame> frameQueue = new ConcurrentLinkedQueue<>();
 	private volatile boolean scanFirstCluster = true;
 	private volatile long firstClusterFilePosition = -1;
-	private volatile long usedSizeBeforeFirstCluster = 0;
+
+	/** Where the data of the Segment starts: the positions stored in the file are relative to it. */
+	private volatile long segmentDataPosition = -1;
+
+	/** Where the SeekHead is, relative to the Segment, or -1 if there is none before the first cluster. */
+	private long seekHeadPosition = -1;
+
+	/** Where the Cues are, relative to the Segment, or -1 when the file does not say. */
+	private long cuesPosition = -1;
+
+	/** The clusters the Cues point at, in file order. Null until {@link #seek(long)} needs them. */
+	private List<CuePosition> cueIndex = null;
+
+	/** A place the Cues point at: a timecode, and the cluster to read from, relative to the Segment. */
+	private record CuePosition(
+			long timecode,
+			long clusterPosition) {}
 
 	/**
 	 * Primary Constructor for Matroska File class.
@@ -124,6 +142,7 @@ public class Reader {
 
 		this.level0 = this.reader.readNextElement();
 		if (this.level0.isType(DocTypes.Segment.getType())) {
+			this.segmentDataPosition = this.ioDS.getFilePointer();
 			level1 = ((MasterElement) this.level0).readNextChild(this.reader);
 			LOG.debug("Got segment element");
 			while (level1 != null) {
@@ -134,14 +153,20 @@ public class Reader {
 				} else if (level1.isType(DocTypes.Tracks.getType())) {
 					parseTracks(level1, level2);
 
+				} else if (level1.isType(DocTypes.SeekHead.getType())) {
+					// Only a seek needs it: a damaged index must not keep the file from opening.
+					this.seekHeadPosition = positionInSegment(level1);
+
+				} else if (level1.isType(DocTypes.Cues.getType())) {
+					// Most files have them after the clusters, where only the SeekHead tells.
+					this.cuesPosition = positionInSegment(level1);
+
 				} else if (level1.isType(DocTypes.Cluster.getType())) {
 					// Remember where the first Cluster header starts for seek() support.
 					// After readNextChild, the file pointer is right after the Cluster header.
 					// Compute the header start by subtracting the header size.
 					final long clusterHeaderSize = level1.getTotalSize() - level1.getSize();
 					this.firstClusterFilePosition = this.ioDS.getFilePointer() - clusterHeaderSize;
-					this.usedSizeBeforeFirstCluster = ((MasterElement) this.level0).getUsedSize()
-							- level1.getTotalSize();
 					if (this.scanFirstCluster) {
 						parseNextCluster(level1);
 					}
@@ -228,8 +253,11 @@ public class Reader {
 	}
 
 	/**
-	 * Seeks to the requested timecode by rescanning clusters and discarding frames
+	 * Seeks to the requested timecode by scanning clusters and discarding frames
 	 * until reaching the nearest timecode less than or equal to the requested one.
+	 * The scan starts from the cluster the Cues give for that timecode. Without usable
+	 * Cues it starts from the first cluster, which finds the same frame after reading
+	 * everything that comes before it.
 	 *
 	 * <p>For example, if frames exist at 0ms, 50ms, 100ms, ... 450ms and we seek to 333ms,
 	 * the seek lands on Frame 7 at 300ms (the last frame with timecode &lt;= 333ms).</p>
@@ -254,13 +282,50 @@ public class Reader {
 			throw new UnsupportedOperationException("DataSource is not seekable");
 		}
 
+		if (this.cueIndex == null) {
+			this.cueIndex = readCueIndex();
+		}
+		// Clusters overlap in time: blocks are not sorted across tracks, so the cluster before the one the cue
+		// names can still hold frames that are due, and the frame the cue names may not come first in its own.
+		// One cue earlier gives what a scan from the start of the file would find; it goes further back only
+		// when that cluster already starts past the timecode.
+		int cue = Math.max(lastCueAt(timecode) - 1, -1);
+		while (true) {
+			final boolean usable = cue >= 0 && isClusterAt(positionOfCue(cue));
+			if (cue >= 0 && !usable) {
+				LOG.warn("The cues point at {}, where there is no cluster: reading from the first one",
+						positionOfCue(cue));
+			}
+			final Frame seekTarget = scanTo(usable ? positionOfCue(cue) : this.firstClusterFilePosition, timecode);
+			if (seekTarget != null) {
+				// Re-insert the seek target at the head of the queue.
+				// Drain, prepend, re-add.
+				final ArrayList<Frame> remaining = new ArrayList<>(this.frameQueue);
+				this.frameQueue.clear();
+				this.frameQueue.add(seekTarget);
+				this.frameQueue.addAll(remaining);
+				return seekTarget.getTimecode();
+			}
+			if (!usable) {
+				return 0;
+			}
+			cue--;
+		}
+	}
+
+	/**
+	 * Reads frames from a cluster until one is past the timecode, leaving the file there.
+	 *
+	 * @return the last frame at or before the timecode, removed from the queue, or {@code null} if none was found
+	 */
+	private Frame scanTo(final long clusterPosition, final long timecode) {
 		// Clear any buffered frames
 		this.frameQueue.clear();
 
-		// Seek the file back to the start of the first Cluster header
-		this.ioDS.seek(this.firstClusterFilePosition);
+		// Move to the header of the cluster
+		this.ioDS.seek(clusterPosition);
 		// Reset the Segment element's usedSize so readNextChild() can re-read clusters
-		((MasterElement) this.level0).setUsedSize(this.usedSizeBeforeFirstCluster);
+		((MasterElement) this.level0).setUsedSize(clusterPosition - this.segmentDataPosition);
 
 		// Read frames, discarding those before the target timecode.
 		// Per the Javadoc: discard until we hit a timecode larger than requested,
@@ -273,28 +338,125 @@ public class Reader {
 			}
 			if (this.frameQueue.isEmpty()) {
 				// End of file. Return what we have.
-				break;
+				return seekTarget;
 			}
 			final Frame head = this.frameQueue.peek();
 			if (head.getTimecode() > timecode) {
 				// Passed the target. seekTarget is the last frame <= timecode.
-				break;
+				return seekTarget;
 			}
 			// This frame's timecode <= requested. Remove and keep as candidate.
 			this.frameQueue.remove();
 			seekTarget = head;
 		}
+	}
 
-		if (seekTarget != null) {
-			// Re-insert the seek target at the head of the queue.
-			// Drain, prepend, re-add.
-			final ArrayList<Frame> remaining = new ArrayList<>(this.frameQueue);
-			this.frameQueue.clear();
-			this.frameQueue.add(seekTarget);
-			this.frameQueue.addAll(remaining);
-			return seekTarget.getTimecode();
+	/** The index of the last cue at or before the timecode, -1 if there is none. */
+	private int lastCueAt(final long timecode) {
+		int found = -1;
+		for (int i = 0; i < this.cueIndex.size() && this.cueIndex.get(i).timecode() <= timecode; i++) {
+			found = i;
 		}
-		return 0;
+		return found;
+	}
+
+	private long positionOfCue(final int cue) {
+		return this.segmentDataPosition + this.cueIndex.get(cue).clusterPosition();
+	}
+
+	private boolean isClusterAt(final long position) {
+		try {
+			this.ioDS.seek(position);
+			final Element element = this.reader.readNextElement();
+			return element != null && element.isType(DocTypes.Cluster.getType());
+		} catch (final RuntimeException ex) {
+			LOG.debug("Can not read at {}", position, ex);
+			return false;
+		}
+	}
+
+	/**
+	 * Reads the Cues as positions in the file. An index that can not be used comes back empty: seeking
+	 * then only costs more, while a wrong index would land on the wrong frames.
+	 */
+	private List<CuePosition> readCueIndex() {
+		try {
+			if (this.cuesPosition < 0 && this.seekHeadPosition >= 0) {
+				this.ioDS.seek(this.segmentDataPosition + this.seekHeadPosition);
+				final Element seekHead = this.reader.readNextElement();
+				if (seekHead != null && seekHead.isType(DocTypes.SeekHead.getType())) {
+					parseSeekHead(seekHead);
+				}
+			}
+			if (this.cuesPosition < 0) {
+				return List.of();
+			}
+			this.ioDS.seek(this.segmentDataPosition + this.cuesPosition);
+			final Element cues = this.reader.readNextElement();
+			if (cues == null || !cues.isType(DocTypes.Cues.getType())) {
+				LOG.warn("The SeekHead points at {}, where there are no cues", this.cuesPosition);
+				return List.of();
+			}
+			final List<CuePosition> index = new ArrayList<>();
+			Element cuePoint = ((MasterElement) cues).readNextChild(this.reader);
+			while (cuePoint != null) {
+				if (cuePoint.isType(DocTypes.CuePoint.getType())) {
+					index.add(parseCuePoint(cuePoint));
+				}
+				cuePoint.skipData(this.ioDS);
+				cuePoint = ((MasterElement) cues).readNextChild(this.reader);
+			}
+			return followsTheFile(index) ? index : List.of();
+		} catch (final RuntimeException ex) {
+			LOG.warn("Can not read the cues: {}", ex.getMessage());
+			return List.of();
+		}
+	}
+
+	/** Several tracks may share a cue point: the earliest of their clusters is where all of them can be found. */
+	private CuePosition parseCuePoint(final Element cuePoint) {
+		long timecode = -1;
+		long clusterPosition = Long.MAX_VALUE;
+		Element child = ((MasterElement) cuePoint).readNextChild(this.reader);
+		while (child != null) {
+			if (child.isType(DocTypes.CueTime.getType())) {
+				child.readData(this.ioDS);
+				timecode = ((UnsignedIntegerElement) child).getValue();
+
+			} else if (child.isType(DocTypes.CueTrackPositions.getType())) {
+				Element position = ((MasterElement) child).readNextChild(this.reader);
+				while (position != null) {
+					if (position.isType(DocTypes.CueClusterPosition.getType())) {
+						position.readData(this.ioDS);
+						clusterPosition = Math.min(clusterPosition, ((UnsignedIntegerElement) position).getValue());
+					}
+					position.skipData(this.ioDS);
+					position = ((MasterElement) child).readNextChild(this.reader);
+				}
+			}
+			child.skipData(this.ioDS);
+			child = ((MasterElement) cuePoint).readNextChild(this.reader);
+		}
+		return new CuePosition(timecode, clusterPosition);
+	}
+
+	/**
+	 * An index is only worth following if time and position advance together. In a file whose clusters are out
+	 * of order, the last cue before a timecode can sit past frames that are still to come.
+	 */
+	private boolean followsTheFile(final List<CuePosition> index) {
+		long timecode = 0;
+		long position = this.firstClusterFilePosition - this.segmentDataPosition;
+		for (final CuePosition cue : index) {
+			if (cue.timecode() < timecode || cue.clusterPosition() < position
+					|| cue.clusterPosition() == Long.MAX_VALUE) {
+				LOG.debug("Ignoring the cues: {} does not follow the file", cue);
+				return false;
+			}
+			timecode = cue.timecode();
+			position = cue.clusterPosition();
+		}
+		return true;
 	}
 
 	private void fillFrameQueue() {
@@ -354,7 +516,8 @@ public class Reader {
 				level2.skipData(this.ioDS);
 
 			} else if (level2.isType(DocTypes.BlockGroup.getType())) {
-				long blockDuration = 0;
+				long blockDuration = Long.MIN_VALUE;
+				long discardPadding = 0;
 				boolean hasReference = false;
 				final ArrayList<Long> references = new ArrayList<>();
 				level3 = ((MasterElement) level2).readNextChild(this.reader);
@@ -368,6 +531,10 @@ public class Reader {
 					} else if (level3.isType(DocTypes.BlockDuration.getType())) {
 						level3.readData(this.ioDS);
 						blockDuration = ((UnsignedIntegerElement) level3).getValue();
+
+					} else if (level3.isType(DocTypes.DiscardPadding.getType())) {
+						level3.readData(this.ioDS);
+						discardPadding = ((SignedIntegerElement) level3).getValue();
 
 					} else if (level3.isType(DocTypes.ReferenceBlock.getType())) {
 						level3.readData(this.ioDS);
@@ -393,11 +560,15 @@ public class Reader {
 					frame.addReferences(ref);
 				}
 				frame.setData(block.getFrame(0));
+				// The padding comes off the end of the block, or off its start when negative.
+				final int paddedFrame = discardPadding < 0 ? 0 : block.getFrameCount() - 1;
+				frame.setDiscardPadding(paddedFrame == 0 ? discardPadding : 0);
 				this.frameQueue.add(new Frame(frame));
 
 				if (block.getFrameCount() > 1) {
 					for (int f = 1; f < block.getFrameCount(); f++) {
 						frame.setData(block.getFrame(f));
+						frame.setDiscardPadding(f == paddedFrame ? discardPadding : 0);
 						/*
 						 * if (badMP3Headers()) { throw new RuntimeException("Bad Data!"); }
 						 */
@@ -424,6 +595,44 @@ public class Reader {
 			}
 		}
 		return false;
+	}
+
+	/** Where an element is, relative to the Segment. Right after reading its header, before anything else. */
+	private long positionInSegment(final Element element) {
+		final long headerSize = element.getTotalSize() - element.getSize();
+		return this.ioDS.getFilePointer() - headerSize - this.segmentDataPosition;
+	}
+
+	private void parseSeekHead(final Element level1) {
+		Element seek = ((MasterElement) level1).readNextChild(this.reader);
+		while (seek != null) {
+			if (seek.isType(DocTypes.Seek.getType())) {
+				parseSeekEntry(seek);
+			}
+			seek.skipData(this.ioDS);
+			seek = ((MasterElement) level1).readNextChild(this.reader);
+		}
+	}
+
+	private void parseSeekEntry(final Element seek) {
+		ByteBuffer id = null;
+		long position = -1;
+		Element child = ((MasterElement) seek).readNextChild(this.reader);
+		while (child != null) {
+			if (child.isType(DocTypes.SeekID.getType())) {
+				child.readData(this.ioDS);
+				id = child.getData();
+
+			} else if (child.isType(DocTypes.SeekPosition.getType())) {
+				child.readData(this.ioDS);
+				position = ((UnsignedIntegerElement) child).getValue();
+			}
+			child.skipData(this.ioDS);
+			child = ((MasterElement) seek).readNextChild(this.reader);
+		}
+		if (position >= 0 && DocTypes.Cues.getType().equals(id)) {
+			this.cuesPosition = position;
+		}
 	}
 
 	private void parseSegmentInfo(final Element level1, Element level2) {

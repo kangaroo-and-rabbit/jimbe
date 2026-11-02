@@ -17,3 +17,29 @@
 ## Concurrence
 
 - `Reader` est prévu pour un usage séquentiel : `readFile()` se termine avant tout autre appel. `fillLock` sérialise `seek()` et le remplissage de la file de frames.
+
+## Écriture Matroska
+
+- Les tracks sont écrites au premier cluster, ou à la fermeture s'il n'y en a aucun : c'est là qu'elles sont connues. Elles prennent 4096 octets, ou leur taille plus 1024 si elles n'y tiennent pas. Cette place ne change plus ensuite, car les clusters la suivent.
+- Une track ajoutée après le premier cluster n'est acceptée que si elle tient dans cette place. Sinon `addTrack()` lève `IllegalStateException` tout de suite, et le fichier reste correct.
+- Un bloc porte une seule frame. `Writer` n'utilise pas le lacing, qui reste disponible par `SimpleBlock.setLaceMode()`. Le lacing fixe refuse des frames de tailles différentes.
+- Un cluster s'arrête à 5 s ou à 4 Mo. Dans un fichier avec vidéo, seule une frame clé vidéo peut le fermer plus tôt : à partir de 1 s ou de 512 Ko, ou aussitôt si le cluster n'en contient aucune. Toutes les frames audio sont des frames clés, elles ne comptent donc pas. Sans vidéo, n'importe quelle frame clé peut le fermer aux mêmes seuils.
+- Un cue désigne un point de départ décodable. Un cluster avec de la vidéo prend au plus un cue, sur sa première frame clé vidéo et pour les seules pistes vidéo qui en ont une à ce timecode. S'il a de la vidéo sans frame clé, il n'en prend aucun. Un cluster sans aucune frame vidéo prend un cue à son début, pour toutes ses pistes : une pochette ou une vidéo courte ne prive pas le reste de l'audio d'index.
+- Une frame vidéo doit porter `setKeyFrame(true)` pour qu'on puisse y sauter : `Frame` est à `false` par défaut, et un fichier vidéo sans frame clé n'a aucun cue. Un `seek()` passe alors par le scan.
+- `CodecDelay` et `SeekPreRoll` sont lus et réécrits, en nanosecondes, et omis s'ils valent 0. Un lecteur retire `CodecDelay` de tous les timecodes de la piste.
+- `DiscardPadding` passe par `Frame` et force un `BlockGroup`, en nanosecondes. D'un bloc lacé, seule la dernière frame le garde, ou la première s'il est négatif, car il se retire alors du début du bloc.
+- Un `BlockGroup` sans `BlockDuration` se lit avec `Long.MIN_VALUE`, comme un `SimpleBlock`, et ne reçoit pas de durée à la réécriture.
+- Un bloc stocke son timecode sur 16 bits signés, relatif à la plus petite frame du cluster, donc de 0 à 32767 unités. Une frame hors de cette plage ferme le cluster avant d'être ajoutée. `SimpleBlock.setTimecode()` refuse une valeur hors plage au lieu de la tronquer.
+- `Writer` garde l'ordre d'arrivée. Un fichier reste valide si les frames ne sont pas en ordre, mais un lecteur ne les trouvera qu'à leur place dans le fichier : c'est à l'appelant de les fournir triées par timecode, sous-titres compris.
+- `DateElement` stocke des nanosecondes signées depuis 2001-01-01 UTC. `UnixEpochDelay` est en secondes.
+
+## Lecture Matroska
+
+- `Block` lit les trois lacings. La dernière frame prend ce que laissent les autres, et le compteur est non signé.
+- `seek()` part du cue qui précède le dernier cue au plus égal au timecode, puis scanne jusqu'à la première frame au-delà. Le SeekHead et les Cues sont lus au premier `seek()`, pour qu'un index abîmé n'empêche pas d'ouvrir le fichier.
+- Un index absent, illisible, désordonné, ou qui ne pointe pas sur un cluster, est ignoré : le scan part alors du premier cluster. Un index n'est suivi que si le temps et la position avancent ensemble.
+- Les blocs ne sont pas triés entre pistes et les clusters se recouvrent dans le temps. Partir du cue exact perdrait des frames encore dues dans le cluster d'avant : partir un cue plus tôt donne le résultat d'un scan depuis le début. Si le scan trouve d'emblée une frame au-delà du timecode, il recule encore d'un cue.
+
+## Forks
+
+- `docs/upstream-forks.md` liste les forks de jebml audités, leur dernier commit et ce qui en a été repris. `tools/check-upstream-forks.py` dit ce qui a changé depuis.

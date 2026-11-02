@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import org.atriasoft.jimbe.ebml.model.BinaryElement;
 import org.atriasoft.jimbe.ebml.model.Element;
 import org.atriasoft.jimbe.ebml.model.MasterElement;
+import org.atriasoft.jimbe.matroska.model.Block;
 import org.atriasoft.jimbe.matroska.model.DocTypes;
 import org.atriasoft.jimbe.matroska.model.Frame;
 import org.atriasoft.jimbe.matroska.model.LaceMode;
@@ -82,22 +83,12 @@ public class SimpleBlockTest {
 	@Test
 	public void testAddFrameReturnsTrueForSmallFrame() {
 		final SimpleBlock block = new SimpleBlock();
-		final Frame frame = makeFrame(1, 0, new byte[] { 0x01, 0x02 });
-		final boolean canAddMore = block.addFrame(frame);
+		block.setLaceMode(LaceMode.XIPH);
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setData(ByteBuffer.wrap(new byte[100]));
 
-		Assertions.assertTrue(canAddMore, "addFrame should return true for a small single frame");
-	}
-
-	@Test
-	public void testAddFrameWithDurationSetsModeNone() {
-		// When duration is set, isSimpleBlock() is false, so addFrame always returns true
-		final SimpleBlock block = new SimpleBlock();
-		final Frame frame = makeFrame(1, 0, new byte[] { 0x01 });
-		frame.setDuration(100);
-		final boolean canAddMore = block.addFrame(frame);
-
-		Assertions.assertTrue(canAddMore);
-		Assertions.assertEquals(100, block.getDuration());
+		Assertions.assertTrue(block.addFrame(frame), "A laced block should accept more than one small frame");
 	}
 
 	// ========== Getters/setters ==========
@@ -146,7 +137,7 @@ public class SimpleBlockTest {
 	@Test
 	public void testLaceModeDefault() {
 		final SimpleBlock block = new SimpleBlock();
-		Assertions.assertEquals(LaceMode.EBML, block.getLaceMode());
+		Assertions.assertEquals(LaceMode.NONE, block.getLaceMode());
 	}
 
 	@Test
@@ -317,5 +308,116 @@ public class SimpleBlockTest {
 		frame.setTimecode(timecode);
 		frame.setData(ByteBuffer.wrap(data));
 		return frame;
+	}
+
+	// ========== default lacing and block timecode ==========
+
+	@Test
+	public void testNoLacingKeepsOneFramePerBlock() {
+		final SimpleBlock block = new SimpleBlock();
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		Assertions.assertFalse(block.addFrame(frame));
+	}
+
+	@Test
+	public void testNoLacingKeepsOneFramePerBlockGroup() {
+		// A frame with a duration, a subtitle for one: the block is written as a BlockGroup.
+		final SimpleBlock block = new SimpleBlock();
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setDuration(100);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		Assertions.assertFalse(block.addFrame(frame));
+		Assertions.assertEquals(100, block.getDuration());
+	}
+
+	@Test
+	public void testTimecodeLimitsAreAccepted() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setTimecode(Short.MAX_VALUE);
+		Assertions.assertEquals(Short.MAX_VALUE, block.getTimecode());
+		block.setTimecode(Short.MIN_VALUE);
+		Assertions.assertEquals(Short.MIN_VALUE, block.getTimecode());
+	}
+
+	@Test
+	public void testTimecodeOutOfRangeIsRefused() {
+		final SimpleBlock block = new SimpleBlock();
+		Assertions.assertThrows(IllegalArgumentException.class, () -> block.setTimecode(Short.MAX_VALUE + 1L));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> block.setTimecode(Short.MIN_VALUE - 1L));
+	}
+
+	// ========== laced blocks read back ==========
+
+	private void assertLacedBlockReadsBack(final LaceMode mode, final int... sizes) {
+		final SimpleBlock block = new SimpleBlock();
+		block.setLaceMode(mode);
+		for (int i = 0; i < sizes.length; i++) {
+			final byte[] data = new byte[sizes[i]];
+			java.util.Arrays.fill(data, (byte) (i + 1));
+			block.addFrame(makeFrame(1, 0, data));
+		}
+
+		final Block read = new Block(block.toSimpleBlock().getData());
+		read.parseBlock();
+
+		Assertions.assertEquals(sizes.length, read.getFrameCount());
+		for (int i = 0; i < sizes.length; i++) {
+			final ByteBuffer frame = read.getFrame(i);
+			Assertions.assertEquals(sizes[i], frame.remaining(), "Size of frame " + i);
+			Assertions.assertEquals((byte) (i + 1), frame.get(), "Content of frame " + i);
+		}
+	}
+
+	@Test
+	public void testEbmlLacingReadsBack() {
+		assertLacedBlockReadsBack(LaceMode.EBML, 100, 110, 120);
+		assertLacedBlockReadsBack(LaceMode.EBML, 120, 110, 100, 90, 80);
+		// Differences on one byte up to 63, on two bytes from 64.
+		assertLacedBlockReadsBack(LaceMode.EBML, 200, 263, 199, 1000, 10, 1500, 7, 1530, 3);
+	}
+
+	@Test
+	public void testXiphLacingReadsBack() {
+		assertLacedBlockReadsBack(LaceMode.XIPH, 100, 110, 120);
+		assertLacedBlockReadsBack(LaceMode.XIPH, 254, 255, 256, 510, 1530, 1529, 765, 1, 2);
+	}
+
+	@Test
+	public void testFixedLacingReadsBack() {
+		assertLacedBlockReadsBack(LaceMode.FIXED, 50, 50, 50, 50);
+	}
+
+	@Test
+	public void testFixedLacingRefusesFramesOfDifferentSizes() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setLaceMode(LaceMode.FIXED);
+		block.addFrame(makeFrame(1, 0, new byte[2]));
+		block.addFrame(makeFrame(1, 0, new byte[3]));
+		Assertions.assertThrows(IllegalStateException.class, block::toSimpleBlock);
+	}
+
+	@Test
+	public void testFrameTooLargeForLacingKeepsTheBlockLaced() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setLaceMode(LaceMode.XIPH);
+		Assertions.assertTrue(block.addFrame(makeFrame(1, 0, new byte[100])));
+		Assertions.assertFalse(block.addFrame(makeFrame(1, 0, new byte[2000])));
+		Assertions.assertEquals(LaceMode.XIPH, block.getLaceMode());
+		assertLacedBlockReadsBack(LaceMode.XIPH, 100, 2000);
+	}
+
+	/** The padding of a block belongs to its last frame: a frame added after would take it. */
+	@Test
+	public void testFrameWithPaddingEndsALacedBlock() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setLaceMode(LaceMode.XIPH);
+		final Frame frame = new Frame();
+		frame.setData(java.nio.ByteBuffer.wrap(new byte[] { 1 }));
+		frame.setDiscardPadding(1000000L);
+		Assertions.assertFalse(block.addFrame(frame));
+		Assertions.assertFalse(block.isSimpleBlock());
 	}
 }

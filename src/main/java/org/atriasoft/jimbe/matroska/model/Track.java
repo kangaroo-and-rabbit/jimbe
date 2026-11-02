@@ -60,7 +60,12 @@ public class Track {
 	private ByteBuffer codecPrivate;
 	private long defaultDuration;
 	private boolean codecDecodeAll = true;
-	private int seekPreroll = 0;
+
+	/** How much of the start of the decoded stream is built up and not played, in nanoseconds. */
+	private long codecDelay = 0;
+
+	/** How long before a seek target decoding must start to be right on it, in nanoseconds. */
+	private long seekPreroll = 0;
 
 	private TrackType trackType;
 
@@ -163,6 +168,14 @@ public class Track {
 			} else if (level3.isType(DocTypes.CodecPrivate.getType())) {
 				level3.readData(ioDS);
 				track.setCodecPrivate(level3.getData());
+
+			} else if (level3.isType(DocTypes.CodecDelay.getType())) {
+				level3.readData(ioDS);
+				track.setCodecDelay(((UnsignedIntegerElement) level3).getValue());
+
+			} else if (level3.isType(DocTypes.SeekPreRoll.getType())) {
+				level3.readData(ioDS);
+				track.setSeekPreroll(((UnsignedIntegerElement) level3).getValue());
 
 			} else if (level3.isType(DocTypes.Video.getType())) {
 				level4 = ((MasterElement) level3).readNextChild(reader);
@@ -282,6 +295,18 @@ public class Track {
 			trackCodecPrivateElem.setData(getCodecPrivate());
 			trackEntryElem.addChildElement(trackCodecPrivateElem);
 
+		}
+
+		// Both default to 0, and a player reads the blocks of the track against the codec delay.
+		if (this.codecDelay != 0) {
+			final UnsignedIntegerElement trackCodecDelayElem = DocTypes.CodecDelay.getInstance();
+			trackCodecDelayElem.setValue(this.codecDelay);
+			trackEntryElem.addChildElement(trackCodecDelayElem);
+		}
+		if (this.seekPreroll != 0) {
+			final UnsignedIntegerElement trackSeekPreRollElem = DocTypes.SeekPreRoll.getInstance();
+			trackSeekPreRollElem.setValue(this.seekPreroll);
+			trackEntryElem.addChildElement(trackSeekPreRollElem);
 		}
 
 		final UnsignedIntegerElement trackDefaultDurationElem = DocTypes.DefaultDuration.getInstance();
@@ -513,13 +538,23 @@ public class Track {
 		this.codecDecodeAll = codecDecodeAll;
 	}
 
+	/** Returns the codec delay in nanoseconds. */
+	public long getCodecDelay() {
+		return this.codecDelay;
+	}
+
+	/** Sets the codec delay in nanoseconds: what a player takes off the timecodes of the track. */
+	public void setCodecDelay(final long codecDelay) {
+		this.codecDelay = codecDelay;
+	}
+
 	/** Returns the seek pre-roll duration in nanoseconds. */
-	public int getSeekPreroll() {
+	public long getSeekPreroll() {
 		return this.seekPreroll;
 	}
 
 	/** Sets the seek pre-roll duration in nanoseconds. */
-	public void setSeekPreroll(final int seekPreroll) {
+	public void setSeekPreroll(final long seekPreroll) {
 		this.seekPreroll = seekPreroll;
 	}
 

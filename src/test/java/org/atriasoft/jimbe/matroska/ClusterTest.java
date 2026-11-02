@@ -317,4 +317,175 @@ public class ClusterTest {
 		final Collection<Integer> tracks = cluster.getTracks();
 		Assertions.assertThrows(UnsupportedOperationException.class, () -> tracks.add(2));
 	}
+
+	// ========== 16 bit block timecodes ==========
+
+	private static Frame frameAt(final long timecode, final boolean keyFrame) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setTimecode(timecode);
+		frame.setKeyFrame(keyFrame);
+		frame.setData(ByteBuffer.wrap(new byte[] { 1 }));
+		return frame;
+	}
+
+	@Test
+	public void testFlushBeforeAFrameTooLate() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(1000, false));
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(1000 + Short.MAX_VALUE, false)));
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameAt(1000 + Short.MAX_VALUE + 1, false)));
+	}
+
+	@Test
+	public void testFlushBeforeAFrameTooEarly() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(40000, false));
+		cluster.addFrame(frameAt(40100, false));
+		// The frame would become the cluster timecode, and the block at 40100 could no longer reach it.
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(40100 - Short.MAX_VALUE, false)));
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameAt(40100 - Short.MAX_VALUE - 1, false)));
+	}
+
+	@Test
+	public void testRangeIsForgottenAfterFlush() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(30000, false));
+		cluster.flush(this.writer);
+		cluster.addFrame(frameAt(100000, false));
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameAt(100001, false)));
+	}
+
+	@Test
+	public void testLastOffsetInRangeIsWritten() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(Short.MAX_VALUE, false));
+		Assertions.assertTrue(cluster.flush(this.writer) > 0);
+	}
+
+	@Test
+	public void testFlushRefusesATimecodeOutOfRange() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameAt(0, false));
+		cluster.addFrame(frameAt(Short.MAX_VALUE + 1L, false));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> cluster.flush(this.writer));
+	}
+
+	// ========== Cues of a file with video ==========
+
+	private static final int VIDEO = 1;
+	private static final int AUDIO = 2;
+
+	private Frame frameOf(final int track, final long timecode, final boolean keyFrame) {
+		return makeFrame(track, timecode, keyFrame, new byte[] { 1 });
+	}
+
+	private static Cluster clusterWithVideo() {
+		final Cluster cluster = new Cluster();
+		cluster.setMinimumParameters(1000, 1024);
+		cluster.addVideoTrack(VIDEO);
+		return cluster;
+	}
+
+	@Test
+	public void testAudioFrameDoesNotEndAClusterOfAFileWithVideo() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		// Every audio frame is a key frame, and this one comes long after the minimum.
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameOf(AUDIO, 2000, true)));
+	}
+
+	@Test
+	public void testVideoKeyFrameEndsAClusterThatHasNone() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, false));
+		cluster.addFrame(frameOf(AUDIO, 10, true));
+		// Well under the minimum: what matters is that the picture starts a cluster.
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameOf(VIDEO, 40, true)));
+	}
+
+	@Test
+	public void testVideoKeyFrameJoinsAClusterThatHasOneUnderTheMinimum() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		Assertions.assertFalse(cluster.shouldFlushBefore(frameOf(VIDEO, 40, true)));
+	}
+
+	@Test
+	public void testVideoKeyFrameEndsAClusterThatHasOneOverTheMinimum() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameOf(VIDEO, 1000, true)));
+	}
+
+	@Test
+	public void testCueNamesTheVideoKeyFrameNotTheCluster() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(AUDIO, 100, true));
+		cluster.addFrame(frameOf(VIDEO, 110, false));
+		cluster.addFrame(frameOf(VIDEO, 120, true));
+		Assertions.assertEquals(100, cluster.getClusterTimecode());
+		Assertions.assertEquals(120, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(VIDEO), cluster.getCueTracks());
+	}
+
+	@Test
+	public void testClusterWithoutVideoKeyFrameTakesNoCue() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, false));
+		cluster.addFrame(frameOf(AUDIO, 10, true));
+		Assertions.assertTrue(cluster.getCueTracks().isEmpty());
+	}
+
+	@Test
+	public void testVideoKeyFrameIsForgottenAfterFlush() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		cluster.flush(this.writer);
+		cluster.addFrame(frameOf(VIDEO, 40, false));
+		Assertions.assertTrue(cluster.getCueTracks().isEmpty());
+		Assertions.assertTrue(cluster.shouldFlushBefore(frameOf(VIDEO, 80, true)));
+	}
+
+	/** Two video tracks whose key frames do not line up: the cue can only speak of the one at its timecode. */
+	@Test
+	public void testCueDoesNotNameATrackWhoseKeyFrameComesLater() {
+		final int otherVideo = 3;
+		final Cluster cluster = clusterWithVideo();
+		cluster.addVideoTrack(otherVideo);
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		cluster.addFrame(frameOf(otherVideo, 0, false));
+		cluster.addFrame(frameOf(otherVideo, 300, true));
+		Assertions.assertEquals(0, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(VIDEO), cluster.getCueTracks());
+	}
+
+	@Test
+	public void testCueNamesEveryVideoTrackWithAKeyFrameAtItsTimecode() {
+		final int otherVideo = 3;
+		final Cluster cluster = clusterWithVideo();
+		cluster.addVideoTrack(otherVideo);
+		cluster.addFrame(frameOf(VIDEO, 0, true));
+		cluster.addFrame(frameOf(otherVideo, 0, true));
+		Assertions.assertEquals(2, cluster.getCueTracks().size());
+	}
+
+	/** A short video track, or a cover, must not leave the rest of the audio without an index. */
+	@Test
+	public void testClusterWithoutAnyVideoFrameTakesACueOnItsOtherTracks() {
+		final Cluster cluster = clusterWithVideo();
+		cluster.addFrame(frameOf(AUDIO, 100, true));
+		Assertions.assertEquals(100, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(AUDIO), cluster.getCueTracks());
+	}
+
+	@Test
+	public void testWithoutVideoACueNamesTheCluster() {
+		final Cluster cluster = new Cluster();
+		cluster.addFrame(frameOf(AUDIO, 100, false));
+		Assertions.assertEquals(100, cluster.getCueTimecode());
+		Assertions.assertIterableEquals(java.util.List.of(AUDIO), cluster.getCueTracks());
+	}
 }

@@ -399,4 +399,230 @@ public class WriterExtendedTest {
 		}
 		Assertions.assertEquals(totalFrames, frameCount);
 	}
+
+	// ========== frames the blocks must keep apart, and timecodes they must keep exact ==========
+
+	private static Track videoTrack() {
+		final Track track = new Track();
+		track.setTrackNo(1);
+		track.setTrackType(TrackType.VIDEO);
+		track.setCodecID("V_VP8");
+		final VideoTrack videoInfo = new VideoTrack();
+		videoInfo.setPixelWidth((short) 320);
+		videoInfo.setPixelHeight((short) 240);
+		track.setVideo(videoInfo);
+		return track;
+	}
+
+	private File writeFrames(final long... timecodes) throws Exception {
+		final File file = File.createTempFile("test-frames", ".mkv");
+		final FileDataWriter out = new FileDataWriter(file.getPath());
+		final Writer writer = new Writer(out);
+		writer.addTrack(videoTrack());
+		for (int i = 0; i < timecodes.length; i++) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(timecodes[i]);
+			frame.setKeyFrame(false);
+			frame.setData(ByteBuffer.wrap(new byte[] { (byte) i, (byte) (i + 1) }));
+			writer.addFrame(frame);
+		}
+		writer.close();
+		out.close();
+		return file;
+	}
+
+	private void assertFramesReadBack(final File file, final long... timecodes) throws Exception {
+		final FileDataSource source = new FileDataSource(file.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		for (int i = 0; i < timecodes.length; i++) {
+			final Frame frame = reader.getNextFrame();
+			Assertions.assertNotNull(frame, "Frame " + i + " is missing");
+			Assertions.assertEquals(timecodes[i], frame.getTimecode(), "Timecode of frame " + i);
+			Assertions.assertEquals(2, frame.getData().remaining(), "Size of frame " + i);
+			Assertions.assertEquals((byte) i, frame.getData().get(), "Content of frame " + i);
+		}
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+		file.delete();
+	}
+
+	@Test
+	public void testFramesOfTheSameTimecodeStaySeparate() throws Exception {
+		final long[] timecodes = { 0, 2000, 2000, 2000, 2000 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
+
+	@Test
+	public void testFrameFarAfterTheOthersKeepsItsTimecode() throws Exception {
+		final long[] timecodes = { 1000, 3600000, 3600040 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
+
+	@Test
+	public void testFrameFarBeforeTheOthersKeepsItsTimecode() throws Exception {
+		final long[] timecodes = { 3600000, 3600040, 0, 40 };
+		assertFramesReadBack(writeFrames(timecodes), timecodes);
+	}
+
+	// ========== tracks larger than the usual reservation ==========
+
+	private static Track audioTrack(final int number, final int codecPrivateSize) {
+		final Track track = new Track();
+		track.setTrackNo(number);
+		track.setTrackUID(number);
+		track.setTrackType(TrackType.AUDIO);
+		track.setCodecID("A_VORBIS");
+		final byte[] codecPrivate = new byte[codecPrivateSize];
+		codecPrivate[codecPrivateSize - 1] = (byte) number;
+		track.setCodecPrivate(ByteBuffer.wrap(codecPrivate));
+		final AudioTrack audio = new AudioTrack();
+		audio.setChannels((short) 2);
+		audio.setSamplingFrequency(48000);
+		track.setAudio(audio);
+		return track;
+	}
+
+	private static Frame frameOf(final int trackNo, final long timecode) {
+		final Frame frame = new Frame();
+		frame.setTrackNo(trackNo);
+		frame.setTimecode(timecode);
+		frame.setData(ByteBuffer.wrap(new byte[] { (byte) trackNo, 2 }));
+		return frame;
+	}
+
+	private void assertLargeTracksReadBack(final int... codecPrivateSizes) throws Exception {
+		final FileDataSource source = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		final Track[] tracks = reader.getTrackList();
+		Assertions.assertEquals(codecPrivateSizes.length + 1, tracks.length);
+		for (int i = 0; i < codecPrivateSizes.length; i++) {
+			final ByteBuffer codecPrivate = tracks[i + 1].getCodecPrivate();
+			Assertions.assertEquals(codecPrivateSizes[i], codecPrivate.remaining());
+			Assertions.assertEquals((byte) (i + 2), codecPrivate.get(codecPrivate.limit() - 1));
+		}
+		Assertions.assertEquals(0, reader.getNextFrame().getTimecode());
+		Assertions.assertEquals(40, reader.getNextFrame().getTimecode());
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+	}
+
+	@Test
+	public void testTracksLargerThanTheUsualBlock() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addTrack(audioTrack(2, 3132));
+		writer.addTrack(audioTrack(3, 3132));
+		writer.addFrame(frameOf(1, 0));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(3132, 3132);
+	}
+
+	@Test
+	public void testTracksThatFillTheUsualBlockExactly() throws Exception {
+		// Around the sizes where the padding left by a 4096 byte block would be 0, 1 or 2 bytes.
+		for (int codecPrivateSize = 3900; codecPrivateSize < 4100; codecPrivateSize++) {
+			final File file = File.createTempFile("test-tracks", ".mkv");
+			final FileDataWriter out = new FileDataWriter(file.getPath());
+			final Writer writer = new Writer(out);
+			writer.addTrack(videoTrack());
+			writer.addTrack(audioTrack(2, codecPrivateSize));
+			writer.addFrame(frameOf(1, 0));
+			writer.close();
+			out.close();
+
+			final FileDataSource source = new FileDataSource(file.getPath());
+			final Reader reader = new Reader(source);
+			reader.readFile();
+			Assertions.assertEquals(codecPrivateSize, reader.getTrackList()[1].getCodecPrivate().remaining());
+			Assertions.assertEquals(0, reader.getNextFrame().getTimecode());
+			source.close();
+			file.delete();
+		}
+	}
+
+	@Test
+	public void testTrackAddedAfterFramesButBeforeTheFirstClusterIsWritten() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.addTrack(audioTrack(2, 6000));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(6000);
+	}
+
+	@Test
+	public void testTrackAddedLateThatStillFits() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.flush();
+		writer.addTrack(audioTrack(2, 500));
+		writer.addFrame(frameOf(2, 40));
+		writer.close();
+
+		assertLargeTracksReadBack(500);
+	}
+
+	@Test
+	public void testTrackAddedLateThatDoesNotFitIsRefusedAtOnce() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.addFrame(frameOf(1, 0));
+		writer.flush();
+		Assertions.assertThrows(IllegalStateException.class, () -> writer.addTrack(audioTrack(2, 8000)));
+		// The refused track leaves the file as it was.
+		writer.addFrame(frameOf(1, 40));
+		writer.close();
+
+		assertLargeTracksReadBack();
+	}
+
+	@Test
+	public void testFileWithoutFrameKeepsItsTracks() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		writer.close();
+
+		final FileDataSource source = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(source);
+		reader.readFile();
+		Assertions.assertEquals(1, reader.getTrackList().length);
+		Assertions.assertNull(reader.getNextFrame());
+		source.close();
+	}
+
+	// ========== cluster limits ==========
+
+	@Test
+	public void testClusterReaches512KilobytesBeforeANonKeyFrameEndsIt() throws Exception {
+		final Writer writer = new Writer(this.ioDW);
+		writer.addTrack(videoTrack());
+		// 400 kB a second of frames without a key frame: only the 5 s or the 4 MB limit may end a cluster.
+		for (int i = 0; i < 100; i++) {
+			final Frame frame = new Frame();
+			frame.setTrackNo(1);
+			frame.setTimecode(i * 40L);
+			frame.setKeyFrame(i == 0);
+			frame.setData(ByteBuffer.wrap(new byte[16 * 1024]));
+			writer.addFrame(frame);
+		}
+		writer.close();
+
+		final byte[] bytes = java.nio.file.Files.readAllBytes(this.destination.toPath());
+		int clusters = 0;
+		// Past the SeekHead, which names the cluster ID too.
+		for (int i = 512; i + 3 < bytes.length; i++) {
+			if (bytes[i] == 0x1F && bytes[i + 1] == 0x43 && bytes[i + 2] == (byte) 0xB6 && bytes[i + 3] == 0x75) {
+				clusters++;
+			}
+		}
+		Assertions.assertEquals(1, clusters);
+	}
 }

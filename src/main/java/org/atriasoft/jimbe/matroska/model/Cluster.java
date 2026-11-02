@@ -43,7 +43,19 @@ public class Cluster {
 	private final Set<Integer> tracks = new HashSet<>();
 	private final List<Long> sliencedTracks = new ArrayList<>();
 
+	/** The video tracks of the file. As long as there are none, any track can be jumped to anywhere. */
+	private final Set<Integer> videoTracks = new HashSet<>();
+
+	/** The video tracks with a key frame at {@link #videoKeyFrameTimecode}, the only ones a cue can name. */
+	private final Set<Integer> videoKeyFrameTracks = new HashSet<>();
+
+	/** The first video key frame of this cluster. */
+	private long videoKeyFrameTimecode = Long.MAX_VALUE;
+
 	private long clusterTimecode = Long.MAX_VALUE;
+
+	/** The latest timecode in this cluster: with the earliest, what the blocks have to reach. */
+	private long latestTimecode = Long.MIN_VALUE;
 	private int sizeLimit = Integer.MAX_VALUE;
 
 	/** What a cluster must hold before a key frame may close it; 0 keeps the old behaviour. */
@@ -85,15 +97,41 @@ public class Cluster {
 	}
 
 	/**
+	 * Declares a video track. From then on only the key frames of video tracks end a cluster or make a cue: a
+	 * player jumps to a picture it can decode, and every frame of an audio track is flagged as a key frame.
+	 *
+	 * @param trackNumber the number of the video track
+	 */
+	public void addVideoTrack(final int trackNumber) {
+		this.videoTracks.add(trackNumber);
+	}
+
+	/**
 	 * Checks if the cluster should be flushed before adding this frame.
 	 * Forces cluster boundaries on keyframes so that Cues always point to seekable positions.
+	 * Also forced when a block could not reach the frame from the cluster timecode.
 	 *
 	 * @param frame the frame about to be added
 	 * @return {@code true} if the cluster should be flushed before adding this frame
 	 */
 	public boolean shouldFlushBefore(final Frame frame) {
-		if (!frame.isKeyFrame() || this.frames.isEmpty()) {
+		if (this.frames.isEmpty()) {
 			return false;
+		}
+		if (exceedsBlockRange(frame.getTimecode())) {
+			return true;
+		}
+		if (!frame.isKeyFrame()) {
+			return false;
+		}
+		if (!this.videoTracks.isEmpty()) {
+			if (!this.videoTracks.contains(frame.getTrackNo())) {
+				return false;
+			}
+			// Everything held so far depends on an earlier key frame: this one can be started from.
+			if (this.videoKeyFrameTracks.isEmpty()) {
+				return true;
+			}
 		}
 		// Big enough, or long enough: below that the key frame joins the cluster
 		// being built instead of starting a new one of its own.
@@ -101,7 +139,17 @@ public class Cluster {
 	}
 
 	/**
-	 * Adds a frame to the cluster.
+	 * A block stores its timecode on 16 signed bits, relative to the earliest frame of the cluster. A frame
+	 * that arrives too late breaks that, and so does one that arrives too early, since it moves the cluster
+	 * timecode away from the frames already held.
+	 */
+	private boolean exceedsBlockRange(final long timecode) {
+		return Math.max(this.latestTimecode, timecode) - Math.min(this.clusterTimecode, timecode) > Short.MAX_VALUE;
+	}
+
+	/**
+	 * Adds a frame to the cluster. Call {@link #shouldFlushBefore(Frame)} first: {@link #flush(DataWriter)} fails
+	 * on frames that are too far apart for a single cluster.
 	 *
 	 * @param frame the frame to add
 	 * @return {@code false} if the cluster limits have been exceeded and a new cluster should be started
@@ -111,9 +159,21 @@ public class Cluster {
 		if (frame.getTimecode() < this.clusterTimecode) {
 			this.clusterTimecode = frame.getTimecode();
 		}
+		if (frame.getTimecode() > this.latestTimecode) {
+			this.latestTimecode = frame.getTimecode();
+		}
 		this.frames.add(frame);
 		this.totalSize += frame.getData().remaining();
 		this.tracks.add(frame.getTrackNo());
+		if (frame.isKeyFrame() && this.videoTracks.contains(frame.getTrackNo())) {
+			if (frame.getTimecode() < this.videoKeyFrameTimecode) {
+				this.videoKeyFrameTracks.clear();
+				this.videoKeyFrameTimecode = frame.getTimecode();
+			}
+			if (frame.getTimecode() == this.videoKeyFrameTimecode) {
+				this.videoKeyFrameTracks.add(frame.getTrackNo());
+			}
+		}
 		return ((frame.getTimecode() - this.clusterTimecode) < this.durationLimit) && (this.totalSize < this.sizeLimit);
 	}
 
@@ -144,33 +204,23 @@ public class Cluster {
 				clusterElem.addChildElement(silentElem);
 			}
 
-			SimpleBlock block = null;
-			boolean forceNew = true;
-			long lastTimecode = 0;
-			int lastTrackNumber = 0;
 			LOG.trace("Timecode for cluster set to {}", this.clusterTimecode);
 			for (final Frame frame : this.frames) {
 				frame.setTimecode(frame.getTimecode() - this.clusterTimecode);
 				LOG.trace("Timecode for frame set to {}", frame.getTimecode());
-				if (forceNew || lastTimecode != frame.getTimecode() || lastTrackNumber != frame.getTrackNo()) {
-					if (block != null) {
-						clusterElem.addChildElement(block.toElement());
-					}
-					block = new SimpleBlock();
-				}
-				lastTimecode = frame.getTimecode();
-				lastTrackNumber = frame.getTrackNo();
-				forceNew = !block.addFrame(frame);
-			}
-			if (block != null) {
+				final SimpleBlock block = new SimpleBlock();
+				block.addFrame(frame);
 				clusterElem.addChildElement(block.toElement());
 			}
 			return clusterElem.writeElement(ioDW);
 		} finally {
 			this.frames.clear();
 			this.tracks.clear();
+			this.videoKeyFrameTracks.clear();
+			this.videoKeyFrameTimecode = Long.MAX_VALUE;
 			this.totalSize = 0;
 			this.clusterTimecode = Long.MAX_VALUE;
+			this.latestTimecode = Long.MIN_VALUE;
 		}
 	}
 
@@ -182,6 +232,31 @@ public class Cluster {
 	/** Returns a read-only view of the track numbers that have frames in this cluster. */
 	public Collection<Integer> getTracks() {
 		return Collections.unmodifiableSet(this.tracks);
+	}
+
+	/** Without a picture in the cluster, what is in it can be started from anywhere. */
+	private boolean holdsVideo() {
+		return !Collections.disjoint(this.tracks, this.videoTracks);
+	}
+
+	/**
+	 * Returns the timecode a cue of this cluster gives: its first video key frame, or its start if it holds no
+	 * video.
+	 *
+	 * @return the timecode of the cue
+	 */
+	public long getCueTimecode() {
+		return holdsVideo() ? this.videoKeyFrameTimecode : this.clusterTimecode;
+	}
+
+	/**
+	 * Returns the tracks a cue of this cluster names. A cluster with video but no key frame has none: a cue on
+	 * it would send a player to a picture it can not decode.
+	 *
+	 * @return a read-only view of the track numbers, empty if this cluster takes no cue
+	 */
+	public Collection<Integer> getCueTracks() {
+		return Collections.unmodifiableSet(holdsVideo() ? this.videoKeyFrameTracks : this.tracks);
 	}
 
 	/**

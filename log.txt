@@ -29,3 +29,45 @@
 - Les échecs "security_update_dependency_not_found" de Dependabot portent sur ces paquets transitifs.
 - Bug existant non traité : mvn checkstyle:check échoue car CheckStyle.xml déclare un module UnusedPrivateField introuvable. La CI ne lance pas Checkstyle.
 - La PR #1 a été fusionnée avant le push de ce retrait : il passe par une PR dédiée.
+
+2026-11-01 - Audit des forks de jebml et correctifs d'écriture et de lecture
+- Demande : noter les forks vérifiés avec leur dernier commit pour ne pas refaire l'analyse, appliquer les correctifs et réduire les risques pour karideo.
+- Audit : amont gelé depuis le 2020-02-17, aucun commit manquant. 36 forks, forks de forks compris : 18 n'ont aucun commit propre. Relevé dans docs/upstream-forks.md, contrôle avec tools/check-upstream-forks.py.
+- Le premier relevé ne portait que sur 9 forks : huit branches n'avaient pas été lues (kokorin, rt1shnik, PDApps, bdhandap, etc.). Rien d'utile de plus, hormis les drapeaux d'accessibilité de rt1shnik.
+- Corrigé : date du segment (écrit 2103, lu 1970), FloatElement au-delà de Float.MAX_VALUE, dernière frame lacée, lacing par défaut, timecode de bloc sur 16 bits, Tracks au-delà de 4096 octets.
+- Ajouté : seek par les Cues, avec repli sur le scan depuis le premier cluster.
+- Décisions : UnixEpochDelay reste en secondes, contrairement à la PR #9, car la constante est publique. Tracks est écrit au premier cluster, sans reprendre jitsi b310849 qui déplace les données sans recalculer les index. Un bloc garde une frame, y compris en BlockGroup.
+- Changements de comportement : le lacing par défaut de SimpleBlock passe à NONE. Writer n'écrit plus Tracks à la construction. addTrack() peut lever IllegalStateException après le premier cluster. SimpleBlock.setTimecode() lève IllegalArgumentException hors plage.
+- Vérifié : 402 tests. 17 fichiers (16 de tools/test-videos, un film de 2 h 05 généré) et les 2 fichiers réels présents dans karideo (film de 2 h 17), lus à l'identique avec l'ancien et le nouveau code.
+- Vérifié au remux avec ffprobe : mêmes paquets par piste sur les fichiers de tools/test-videos et le film de 2 h 05 (Vorbis, deux pistes), y compris les trois fichiers qui plantaient. Date correcte. Lacing Xiph, EBML, fixe et 200 frames : tailles identiques à ffprobe, l'ancien code plantait.
+- Seek : 41 points par fichier, 17 fichiers : 2 min 48 avant, 7 s après. 6 résultats sur 697 diffèrent : le nouveau trouve la frame exacte (42003) là où l'ancien s'arrêtait 25 unités avant.
+- Vérifié côté consommateurs avec cette version : 48 tests de karideo et 6 de karusic.
+- Écart déjà présent, non traité : CodecDelay n'est pas conservé au remux, l'Opus se décale de 7 ms.
+- Reste dans SimpleBlock : les encodeurs de lacing restent faux, mais Writer ne les atteint plus. Les autres restes sont dans docs/upstream-forks.md.
+- Ces correctifs n'arrivent à karideo et karusic qu'avec une version publiée de jimbe.
+- Fichiers de cette session : DateElement, FloatElement, Block, SimpleBlock, Cluster, Tracks, Writer, matroska/Reader, leurs tests, spec.md, docs/upstream-forks.md, tools/check-upstream-forks.py. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
+
+2026-11-01 - Revue avant push de l'audit des forks
+- Correction de l'entrée précédente : les 6 résultats de seek différents n'étaient pas une amélioration. Le seek partait du cue exact et perdait les frames encore dues dans le cluster d'avant, par exemple l'audio à 42004 pour un seek à 42003. Il part maintenant un cue plus tôt.
+- Correction aussi : les encodeurs de lacing ne restent pas faux, ils sont corrigés.
+- Vérifié après correction : 697 seeks sur 17 fichiers et 41 sur le film réel de karideo, tous identiques à l'ancien code. Sur ce film, 1 min 35 avant, moins de 12 s après, lecture complète du fichier comprise. 413 tests, plus 48 de karideo et 6 de karusic.
+- Cluster limité à 128 Ko au lieu de 4 Mo : une ligne oubliée par c2874ae écrasait la limite voulue. Elle est retirée, avec vérification au remux. Les fichiers vidéo seuls ont moins de clusters et donc moins de cues. Sur un fichier avec audio, un cluster peut encore commencer sur une frame audio.
+- SeekHead lu au premier seek et non dans readFile() : il faisait échouer l'ouverture d'un fichier à l'index abîmé. Date vide lue comme l'epoch, date hors plage refusée. FloatElement traite aussi les grandes valeurs négatives. Un échec d'écriture de Tracks n'est plus pris pour une réussite.
+- Remarque non retenue : Cluster.flush() peut perdre un cluster si un appelant direct ignore shouldFlushBefore() ou modifie une frame déjà ajoutée. Writer respecte ce contrat, et une erreur est levée.
+- Remux refait avec la version finale : mêmes paquets et mêmes frames clés qu'à la source sur les 17 fichiers, à part le décalage Opus connu.
+
+2026-11-02 - Correction des restes de l'audit
+- Cues : dans un fichier avec vidéo, chaque cluster prend au plus un cue, sur sa première frame clé vidéo. L'audio ne ferme plus de cluster, et un cluster sans frame clé vidéo n'a plus de cue. Une frame clé vidéo ferme aussitôt un cluster qui n'en a pas, pour commencer le suivant.
+- Vérifié avec ffmpeg : image décodée après 9 sauts par fichier, comparée à la source. Avant : fausse sur 7 sauts sur 9 d'un film à longs GOP, 8 sur 9 sur vp9_var_1audio et av1_var_2audio, 5 sur 9 sur le film réel de karideo. Après : identique partout.
+- CodecDelay et SeekPreRoll sont lus et réécrits : le décalage Opus de 7 ms au remux disparaît. seekPreroll passe de int à long, comme l'élément.
+- DiscardPadding était perdu aussi, ce que le contrôle ffprobe ne montrait pas avant d'avoir comparé les paquets un à un. Il passe par Frame.
+- Remarque levée : les sous-titres gardent bien leur durée au remux, SimpleBlock.addFrame() la reprend.
+- Limite connue : Track ne lit que quatre éléments de Video, donc Colour se perd au remux.
+- Fichiers de cette session : Track, Frame, SimpleBlock, Cluster, Cues, Writer, matroska/Reader, leurs tests, spec.md. Travail fait dans un worktree, sur fix/writer-reader-fork-audit.
+
+2026-11-02 - Revue avant push des cues et du timing Opus
+- Corrigé : un BlockGroup sans BlockDuration se lisait avec une durée 0, réécrite ensuite comme une vraie durée. Il se lit maintenant avec Long.MIN_VALUE, ce qui change Frame.getDuration() pour ce cas.
+- Corrigé : avec deux pistes vidéo aux GOP décalés, le cue nommait aussi celle dont la frame clé venait plus tard. Il ne nomme plus que les pistes qui en ont une à son timecode.
+- Corrigé : une piste vidéo sans frames, comme une pochette, privait l'audio de cues. Un cluster sans frame vidéo prend de nouveau un cue.
+- Corrigé : un DiscardPadding négatif d'un bloc lacé va sur la première frame, un DiscardPadding vide se lit 0 au lieu de planter, et une frame avec padding ferme un bloc lacé.
+- Non retenu : Cues reste écrit vide dans un fichier vidéo sans frame clé. Le schéma veut un CuePoint, mais karideo lit le SeekHead pour juger l'index, et ce cas ne vient que d'un appelant qui ne marque pas ses frames clés.

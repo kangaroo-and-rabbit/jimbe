@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.atriasoft.jimbe.ebml.Reader;
-import org.atriasoft.jimbe.ebml.model.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,10 +67,7 @@ public class Block {
 	 * @throws RuntimeException if an unsupported lacing type is encountered
 	 */
 	public void parseBlock() {
-		int index = 0;
 		this.trackNo = (int) Reader.readEBMLCode(this.data);
-		index = Element.codedSizeLength(this.trackNo, 0);
-		this.headerSize += index;
 
 		this.blockTimecode = this.data.getShort();
 		LOG.trace("Block belongs to track {} @ {}", this.trackNo, this.blockTimecode);
@@ -85,19 +81,15 @@ public class Block {
 		}
 
 		final int laceFlag = flagsByte & 0x06;
-		index++;
-		// Increase the HeaderSize by the number of bytes we have read
-		this.headerSize += 3;
 		if (laceFlag != 0x00) {
-			// We have lacing
-			final byte laceCount = this.data.get();
-			this.headerSize += 1;
+			// We have lacing. The count is unsigned: a block holds up to 256 frames.
+			final int laceCount = this.data.get() & 0xFF;
 			if (laceFlag == 0x02) { // Xiph Lacing
 				LOG.trace("Reading xiph lace sizes");
-				this.sizes = readXiphLaceSizes(index, laceCount);
+				this.sizes = readXiphLaceSizes(laceCount);
 			} else if (laceFlag == 0x06) { // EBML Lacing
 				LOG.trace("Reading ebml lace sizes");
-				this.sizes = readEBMLLaceSizes(index, laceCount);
+				this.sizes = readEBMLLaceSizes(laceCount);
 			} else if (laceFlag == 0x04) { // Fixed Size Lacing
 				LOG.trace("Fixed lace sizes");
 				this.sizes = new int[laceCount + 1];
@@ -110,67 +102,42 @@ public class Block {
 			}
 			LOG.trace("Lace sizes: {}", Arrays.toString(this.sizes));
 		}
-		// data = new byte[(int)(this.getSize() - HeaderSize)];
-		// source.read(data, 0, data.length);
-		// this.dataRead = true;
 		this.headerSize = this.data.position();
 	}
 
-	private int[] readEBMLLaceSizes(int index, final short laceCount) {
+	private int[] readEBMLLaceSizes(final int laceCount) {
 		final int[] laceSizes = new int[laceCount + 1];
-		laceSizes[laceCount] = this.data.remaining();
-
-		// This uses the DataSource.getBytePosition() for finding the header size
-		// because of the trouble of finding the byte size of sized ebml coded integers
-		// long ByteStartPos = source.getFilePointer();
-		final int startIndex = index;
-
-		laceSizes[0] = (int) Reader.readEBMLCode(this.data);
-		index += Element.codedSizeLength(laceSizes[0], 0);
-		laceSizes[laceCount] -= laceSizes[0];
-
-		long firstEBMLSize = laceSizes[0];
-		long lastEBMLSize = 0;
-		for (int l = 0; l < laceCount - 1; l++) {
-			lastEBMLSize = Reader.readSignedEBMLCode(this.data);
-			index += Element.codedSizeLength(lastEBMLSize, 0);
-
-			firstEBMLSize += lastEBMLSize;
-			laceSizes[l + 1] = (int) firstEBMLSize;
-
-			// Update the size of the last block
-			laceSizes[laceCount] -= laceSizes[l + 1];
+		long previousSize = 0;
+		for (int l = 0; l < laceCount; l++) {
+			// The first size is absolute, each of the others is relative to the one before.
+			previousSize = l == 0 ? Reader.readEBMLCode(this.data)
+					: previousSize + Reader.readSignedEBMLCode(this.data);
+			laceSizes[l] = (int) previousSize;
 		}
-		// long ByteEndPos = source.getFilePointer();
-
-		// HeaderSize = HeaderSize + (int)(ByteEndPos - ByteStartPos);
-		this.headerSize = this.headerSize + index - startIndex;
-		laceSizes[laceCount] -= this.headerSize;
-
+		laceSizes[laceCount] = sizeOfLastLace(laceSizes, laceCount);
 		return laceSizes;
 	}
 
-	private int[] readXiphLaceSizes(final int index, final short laceCount) {
+	private int[] readXiphLaceSizes(final int laceCount) {
 		final int[] laceSizes = new int[laceCount + 1];
-		laceSizes[laceCount] = this.data.remaining();
-
-		// long ByteStartPos = source.getFilePointer();
-
 		for (int l = 0; l < laceCount; l++) {
-			short laceSizeByte = 255;
+			int laceSizeByte = 255;
 			while (laceSizeByte == 255) {
-				laceSizeByte = (short) (this.data.get() & 0xFF);
-				this.headerSize += 1;
+				laceSizeByte = this.data.get() & 0xFF;
 				laceSizes[l] += laceSizeByte;
 			}
-			// Update the size of the last block
-			laceSizes[laceCount] -= laceSizes[l];
 		}
-		// long ByteEndPos = source.getFilePointer();
-
-		laceSizes[laceCount] -= this.headerSize;
-
+		laceSizes[laceCount] = sizeOfLastLace(laceSizes, laceCount);
 		return laceSizes;
+	}
+
+	/** The last frame has no size of its own: it takes what the others leave. The sizes must all have been read. */
+	private int sizeOfLastLace(final int[] laceSizes, final int laceCount) {
+		int size = this.data.remaining();
+		for (int l = 0; l < laceCount; l++) {
+			size -= laceSizes[l];
+		}
+		return size;
 	}
 
 	/**
