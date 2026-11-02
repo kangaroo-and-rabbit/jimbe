@@ -55,10 +55,13 @@ public class SignedIntegerElement extends BinaryElement {
 	/**
 	 * Returns the signed integer value.
 	 *
-	 * @return the decoded signed value
+	 * @return the decoded signed value, 0 for an empty element
 	 */
 	public long getValue() {
 		final byte[] dataArray = this.data.array();
+		if (dataArray.length == 0) {
+			return 0;
+		}
 		long l = 0;
 		long tmp = 0;
 		l |= ((long) dataArray[0] << (56 - ((8 - dataArray.length) * 8)));

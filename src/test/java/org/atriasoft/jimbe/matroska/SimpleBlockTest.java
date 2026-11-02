@@ -408,4 +408,16 @@ public class SimpleBlockTest {
 		Assertions.assertEquals(LaceMode.XIPH, block.getLaceMode());
 		assertLacedBlockReadsBack(LaceMode.XIPH, 100, 2000);
 	}
+
+	/** The padding of a block belongs to its last frame: a frame added after would take it. */
+	@Test
+	public void testFrameWithPaddingEndsALacedBlock() {
+		final SimpleBlock block = new SimpleBlock();
+		block.setLaceMode(LaceMode.XIPH);
+		final Frame frame = new Frame();
+		frame.setData(java.nio.ByteBuffer.wrap(new byte[] { 1 }));
+		frame.setDiscardPadding(1000000L);
+		Assertions.assertFalse(block.addFrame(frame));
+		Assertions.assertFalse(block.isSimpleBlock());
+	}
 }

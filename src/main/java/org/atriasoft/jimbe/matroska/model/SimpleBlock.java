@@ -314,6 +314,10 @@ public class SimpleBlock {
 		if (this.laceMode == LaceMode.NONE) {
 			return false;
 		}
+		// The padding of a block belongs to its last frame: another one would take it.
+		if (frame.getDiscardPadding() != 0) {
+			return false;
+		}
 		return !isSimpleBlock() || this.frames.size() <= 8;
 	}
 

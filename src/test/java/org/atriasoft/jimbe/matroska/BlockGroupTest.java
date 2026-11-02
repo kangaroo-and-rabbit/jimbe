@@ -517,8 +517,9 @@ public class BlockGroupTest {
 		writeRawElement(inner, new byte[] { (byte) 0x9B }, encodeUnsignedInt(duration));
 
 		if (discardPadding != 0) {
-			// DiscardPadding (0x75A2)
-			writeRawElement(inner, new byte[] { 0x75, (byte) 0xA2 }, encodeUnsignedInt(discardPadding));
+			// DiscardPadding (0x75A2), signed
+			writeRawElement(inner, new byte[] { 0x75, (byte) 0xA2 },
+					ByteBuffer.allocate(Long.BYTES).putLong(discardPadding).array());
 		}
 
 		// Wrap in BlockGroup (0xA0)
@@ -607,6 +608,43 @@ public class BlockGroupTest {
 		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
 		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
 		Assertions.assertEquals(5000000, reader.getNextFrame().getDiscardPadding());
+	}
+
+	/** Negative, the padding comes off the start of the block. */
+	@Test
+	public void testLacedBlockGroupKeepsANegativePaddingOnItsFirstFrame() throws IOException {
+		writeBaseMkv();
+
+		final byte[][] frameData = { { 0x11, 0x22, 0x33 }, { 0x44, 0x55, 0x66 }, { 0x77, (byte) 0x88, (byte) 0x99 } };
+		replaceCluster(buildCluster(0, buildLacedBlockGroup(1, (short) 0, frameData, 100, -2500000)));
+
+		final FileDataSource inputDataSource = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(inputDataSource);
+		reader.readFile();
+
+		Assertions.assertEquals(-2500000, reader.getNextFrame().getDiscardPadding());
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
+	}
+
+	/** EBML reads an empty integer as 0, and a file is allowed to write one. */
+	@Test
+	public void testEmptyDiscardPaddingReadsAsNothing() throws IOException {
+		writeBaseMkv();
+
+		final ByteArrayOutputStream inner = new ByteArrayOutputStream();
+		writeRawElement(inner, new byte[] { (byte) 0xA1 },
+				buildFixedLacedBlock(1, (short) 0, new byte[][] { { 0x11 } }));
+		writeRawElement(inner, new byte[] { 0x75, (byte) 0xA2 }, new byte[0]);
+		final ByteArrayOutputStream group = new ByteArrayOutputStream();
+		writeRawElement(group, new byte[] { (byte) 0xA0 }, inner.toByteArray());
+		replaceCluster(buildCluster(0, group.toByteArray()));
+
+		final FileDataSource inputDataSource = new FileDataSource(this.destination.getPath());
+		final Reader reader = new Reader(inputDataSource);
+		reader.readFile();
+
+		Assertions.assertEquals(0, reader.getNextFrame().getDiscardPadding());
 	}
 
 	/**

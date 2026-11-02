@@ -150,8 +150,8 @@ public class ReaderRoundTripTest {
 		frame.setDiscardPadding(1000000L);
 		writeOpusFrames(frame);
 
-		// A BlockGroup that says nothing of its duration reads back as 0, not as what was never set.
-		Assertions.assertEquals(0, openReader().getNextFrame().getDuration());
+		// A BlockGroup that says nothing of its duration: a 0 here would be written out at the next copy.
+		Assertions.assertEquals(Long.MIN_VALUE, openReader().getNextFrame().getDuration());
 	}
 
 	@Test
