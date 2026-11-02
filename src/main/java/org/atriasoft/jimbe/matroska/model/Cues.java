@@ -38,22 +38,19 @@ public class Cues {
 	 * Adds a cue point entry for a cluster.
 	 *
 	 * @param positionInFile the absolute byte position of the cluster in the file
-	 * @param timecodeOfCluster the timecode of the cluster
-	 * @param clusterTrackNumbers the track numbers that have data in the cluster
+	 * @param timecode the timecode a player can start from in that cluster
+	 * @param trackNumbers the track numbers it can start from there
 	 */
-	public void addCue(
-			final long positionInFile,
-			final long timecodeOfCluster,
-			final Collection<Integer> clusterTrackNumbers) {
+	public void addCue(final long positionInFile, final long timecode, final Collection<Integer> trackNumbers) {
 		LOG.debug("Adding matroska cue to cues element at position [{}], using timecode [{}], for track numbers [{}]",
-				positionInFile, timecodeOfCluster, clusterTrackNumbers);
+				positionInFile, timecode, trackNumbers);
 
 		final UnsignedIntegerElement cueTime = DocTypes.CueTime.getInstance();
-		cueTime.setValue(timecodeOfCluster);
+		cueTime.setValue(timecode);
 		final MasterElement cuePoint = DocTypes.CuePoint.getInstance();
 
 		cuePoint.addChildElement(cueTime);
-		addCueTrackPositions(cuePoint, positionInFile, clusterTrackNumbers);
+		addCueTrackPositions(cuePoint, positionInFile, trackNumbers);
 		this.cues.addChildElement(cuePoint);
 
 		LOG.debug("Finished adding matroska cue to cues element");

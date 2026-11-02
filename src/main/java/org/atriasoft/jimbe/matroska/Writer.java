@@ -34,6 +34,7 @@ import org.atriasoft.jimbe.matroska.model.MetaSeek;
 import org.atriasoft.jimbe.matroska.model.Segment;
 import org.atriasoft.jimbe.matroska.model.SegmentInfo;
 import org.atriasoft.jimbe.matroska.model.Track;
+import org.atriasoft.jimbe.matroska.model.TrackType;
 import org.atriasoft.jimbe.matroska.model.Tracks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,6 +213,9 @@ public class Writer {
 	 */
 	public void addTrack(final Track track) {
 		this.tracks.addTrack(track);
+		if (track.getTrackType() == TrackType.VIDEO) {
+			this.cluster.addVideoTrack(track.getTrackNo());
+		}
 	}
 
 	/**
@@ -256,8 +260,9 @@ public class Writer {
 			return;
 		}
 		writeTracksOnce();
-		final long clusterPos = this.ioDW.getFilePointer();
-		this.cueData.addCue(clusterPos, this.cluster.getClusterTimecode(), this.cluster.getTracks());
+		if (!this.cluster.getCueTracks().isEmpty()) {
+			this.cueData.addCue(this.ioDW.getFilePointer(), this.cluster.getCueTimecode(), this.cluster.getCueTracks());
+		}
 		LOG.debug("Cluster flushing, timecode {}", this.cluster.getClusterTimecode());
 		this.cluster.flush(this.ioDW);
 	}
