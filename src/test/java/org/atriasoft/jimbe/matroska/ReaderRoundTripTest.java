@@ -287,6 +287,33 @@ public class ReaderRoundTripTest {
 		Assertions.assertEquals("S_TEXT/UTF8", readTrack.getCodecID());
 		Assertions.assertEquals("fra", readTrack.getLanguage());
 		Assertions.assertEquals("Test Subtitle", readTrack.getName());
+		// The flags are read back, not left at their defaults: a forced subtitle is the lines to show without subtitles, a non default track is not played first.
+		Assertions.assertTrue(readTrack.isFlagEnabled());
+		Assertions.assertFalse(readTrack.isFlagDefault());
+		Assertions.assertTrue(readTrack.isFlagForced());
+		Assertions.assertFalse(readTrack.isFlagLacing());
+	}
+
+	@Test
+	public void testDisabledTrackFlagRoundTrip() throws IOException {
+		final Writer writer = new Writer(this.ioDW);
+		final Track track = new Track();
+		track.setTrackNo(1);
+		track.setTrackType(TrackType.SUBTITLE);
+		track.setCodecID("S_TEXT/UTF8");
+		track.setFlagEnabled(false);
+		writer.addTrack(track);
+		final Frame frame = new Frame();
+		frame.setTrackNo(1);
+		frame.setTimecode(0);
+		frame.setData(ByteBuffer.wrap("Hello".getBytes(StandardCharsets.UTF_8)));
+		writer.addFrame(frame);
+		writer.close();
+		final Track readTrack = openReader().getTrackList()[0];
+		Assertions.assertFalse(readTrack.isFlagEnabled());
+		Assertions.assertTrue(readTrack.isFlagDefault());
+		Assertions.assertFalse(readTrack.isFlagForced());
+		Assertions.assertTrue(readTrack.isFlagLacing());
 	}
 
 	@Test

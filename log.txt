@@ -71,3 +71,8 @@
 - Corrigé : une piste vidéo sans frames, comme une pochette, privait l'audio de cues. Un cluster sans frame vidéo prend de nouveau un cue.
 - Corrigé : un DiscardPadding négatif d'un bloc lacé va sur la première frame, un DiscardPadding vide se lit 0 au lieu de planter, et une frame avec padding ferme un bloc lacé.
 - Non retenu : Cues reste écrit vide dans un fichier vidéo sans frame clé. Le schéma veut un CuePoint, mais karideo lit le SeekHead pour juger l'index, et ce cas ne vient que d'un appelant qui ne marque pas ses frames clés.
+
+2026-11-05 - Drapeaux des pistes relus
+- Track.fromElement relit FlagEnabled, FlagDefault, FlagForced et FlagLacing : ils étaient écrits mais jamais relus, toute piste lue passait pour activée, par défaut, non forcée et lacée. Le test aller-retour des drapeaux les écrivait sans les vérifier.
+- Demandé par karideo (sous-titres forcés d'un rip Blu-ray rangés à part des complets) : n'y arrive qu'avec une version publiée (1.2.1). À noter pour karideo au passage : TvCutAudios lit isFlagDefault(), qui dit désormais ce que le fichier porte.
+- 437 tests verts.

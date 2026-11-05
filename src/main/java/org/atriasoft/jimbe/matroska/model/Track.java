@@ -177,6 +177,22 @@ public class Track {
 				level3.readData(ioDS);
 				track.setSeekPreroll(((UnsignedIntegerElement) level3).getValue());
 
+			} else if (level3.isType(DocTypes.FlagEnabled.getType())) {
+				level3.readData(ioDS);
+				track.setFlagEnabled(((UnsignedIntegerElement) level3).getValue() != 0);
+
+			} else if (level3.isType(DocTypes.FlagDefault.getType())) {
+				level3.readData(ioDS);
+				track.setFlagDefault(((UnsignedIntegerElement) level3).getValue() != 0);
+
+			} else if (level3.isType(DocTypes.FlagForced.getType())) {
+				level3.readData(ioDS);
+				track.setFlagForced(((UnsignedIntegerElement) level3).getValue() != 0);
+
+			} else if (level3.isType(DocTypes.FlagLacing.getType())) {
+				level3.readData(ioDS);
+				track.setFlagLacing(((UnsignedIntegerElement) level3).getValue() != 0);
+
 			} else if (level3.isType(DocTypes.Video.getType())) {
 				level4 = ((MasterElement) level3).readNextChild(reader);
 				track.video = new VideoTrack();
